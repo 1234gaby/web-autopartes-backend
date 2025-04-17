@@ -16,7 +16,7 @@ sequelize.sync().then(() => {
 
 // Registro
 app.post('/register', async (req, res) => {
-  const { email, password } = req.body
+  const { email, password } = req.body;
   try {
     const usuario = await User.create({ email, password })
     res.status(201).json({ mensaje: 'Usuario registrado', usuario })
