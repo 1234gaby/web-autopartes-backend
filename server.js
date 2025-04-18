@@ -58,6 +58,17 @@ app.post('/publicaciones', (req, res) => {
       res.status(500).json({ mensaje: 'Error al crear la publicación', error: error.message });
     }
   });
+// Ver publicaciones
+app.get('/publicaciones', (req, res) => {
+    try {
+      const stmt = db.prepare('SELECT * FROM publicaciones');
+      const publicaciones = stmt.all();
+      res.json(publicaciones);
+    } catch (err) {
+      console.error('Error al obtener publicaciones:', err);
+      res.status(500).json({ mensaje: 'Error al obtener publicaciones' });
+    }
+  });
   
 // Iniciar servidor
 app.listen(PORT, () => {
