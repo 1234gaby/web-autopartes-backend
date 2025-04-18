@@ -1,7 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const { createUser, findUserByEmail } = require('./models/User');
-const db = require('./database'); // <-- asegurate de importar la base
+const { crearPublicacion } = require('./models/Publicacion'); // ✅ importar función de publicación
+const db = require('./database'); // ✅ importar base de datos
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,10 +10,12 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Ruta base
 app.get('/', (req, res) => {
   res.send('Servidor funcionando con better-sqlite3 🚀');
 });
 
+// Registro
 app.post('/register', (req, res) => {
   const { email, password } = req.body;
   try {
@@ -23,6 +26,7 @@ app.post('/register', (req, res) => {
   }
 });
 
+// Login
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
   const user = findUserByEmail(email);
@@ -32,7 +36,7 @@ app.post('/login', (req, res) => {
   res.json({ mensaje: 'Login exitoso' });
 });
 
-// 🔍 Endpoint para ver los usuarios
+// Ver usuarios
 app.get('/usuarios', (req, res) => {
   try {
     const stmt = db.prepare('SELECT * FROM users');
@@ -44,6 +48,18 @@ app.get('/usuarios', (req, res) => {
   }
 });
 
+// ✅ Crear publicación
+app.post('/publicaciones', (req, res) => {
+  try {
+    crearPublicacion(req.body);
+    res.status(201).json({ mensaje: 'Publicación creada' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ mensaje: 'Error al crear la publicación' });
+  }
+});
+
+// Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
