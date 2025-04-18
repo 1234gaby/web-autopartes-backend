@@ -1,9 +1,14 @@
-const { Sequelize } = require('sequelize')
+// database.js
+const Database = require('better-sqlite3');
+const db = new Database('usuarios.db');
 
-// Crea una base de datos local llamada 'autopartes.db'
-const sequelize = new Sequelize({
-  dialect: 'sqlite',
-  storage: './autopartes.db'
-})
+// Crear tabla si no existe
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE,
+    password TEXT
+  )
+`).run();
 
-module.exports = sequelize
+module.exports = db;
