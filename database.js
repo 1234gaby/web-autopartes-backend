@@ -1,6 +1,6 @@
 // database.js
 const Database = require('better-sqlite3');
-const db = new Database('usuarios.db');
+const db = new Database('autopartes.db');
 
 // Crear tabla si no existe
 db.prepare(`
