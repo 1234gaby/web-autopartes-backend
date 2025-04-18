@@ -10,5 +10,5 @@ db.prepare(`
     password TEXT
   )
 `).run();
-
-module.exports = db;
+  
+  module.exports = db;
