@@ -4,7 +4,7 @@ const db = new Database('usuarios.db');
 
 // Crear tabla si no existe
 db.prepare(`
-  CREATE TABLE IF NOT EXISTS usuarios (
+  CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT UNIQUE,
     password TEXT
