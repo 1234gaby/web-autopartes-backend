@@ -48,17 +48,17 @@ app.get('/usuarios', (req, res) => {
   }
 });
 
-// ✅ Crear publicación
 app.post('/publicaciones', (req, res) => {
-  try {
-    crearPublicacion(req.body);
-    res.status(201).json({ mensaje: 'Publicación creada' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ mensaje: 'Error al crear la publicación' });
-  }
-});
-
+    try {
+      console.log('Datos recibidos:', req.body); // 👈 nuevo log
+      crearPublicacion(req.body);
+      res.status(201).json({ mensaje: 'Publicación creada' });
+    } catch (error) {
+      console.error('Error al crear publicación:', error); // 👈 más detallado
+      res.status(500).json({ mensaje: 'Error al crear la publicación', error: error.message });
+    }
+  });
+  
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
