@@ -1,7 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const Database = require('better-sqlite3');  // Asegúrate de importar better-sqlite3
-const db = new Database('usuarios.db');     // Ruta a tu base de datos SQLite
+const { createUser, findUserByEmail } = require('./models/User');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -13,7 +12,6 @@ app.get('/', (req, res) => {
   res.send('Servidor funcionando con better-sqlite3 🚀');
 });
 
-// Crear usuario
 app.post('/register', (req, res) => {
   const { email, password } = req.body;
   try {
@@ -24,7 +22,6 @@ app.post('/register', (req, res) => {
   }
 });
 
-// Login
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
   const user = findUserByEmail(email);
@@ -34,18 +31,18 @@ app.post('/login', (req, res) => {
   res.json({ mensaje: 'Login exitoso' });
 });
 
-// Obtener usuarios
-app.get('/usuarios', (req, res) => {
-  try {
-    const stmt = db.prepare('SELECT * FROM usuarios');
-    const usuarios = stmt.all();
-    res.json(usuarios);
-  } catch (err) {
-    console.error(err); // Esto te ayudará a ver más detalles en los logs
-    res.status(500).json({ mensaje: 'Error al obtener usuarios' });
-  }
-});
-
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
+
+// En tu archivo del backend (app.js o server.js)
+app.get('/usuarios', (req, res) => {
+    try {
+      const stmt = db.prepare('SELECT * FROM usuarios');
+      const usuarios = stmt.all();
+      res.json(usuarios);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ mensaje: 'Error al obtener usuarios' });
+    }
+  });
