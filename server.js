@@ -34,3 +34,15 @@ app.post('/login', (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
+
+// En tu archivo del backend (app.js o server.js)
+app.get('/usuarios', (req, res) => {
+    try {
+      const stmt = db.prepare('SELECT * FROM usuarios');
+      const usuarios = stmt.all();
+      res.json(usuarios);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ mensaje: 'Error al obtener usuarios' });
+    }
+  });
