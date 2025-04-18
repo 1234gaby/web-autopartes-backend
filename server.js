@@ -39,19 +39,29 @@ app.post('/login', (req, res) => {
 });
 
 // Nueva ruta para obtener todos los usuarios de la base de datos
+// Ruta para obtener usuarios
 app.get('/usuarios', (req, res) => {
-  try {
-    // Consultar todos los usuarios de la tabla
-    const stmt = db.prepare('SELECT * FROM usuarios');
-    const usuarios = stmt.all(); // Ejecutar la consulta
-    res.json(usuarios); // Enviar los resultados como respuesta JSON
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ mensaje: 'Error al obtener usuarios' });
-  }
-});
-
-// Iniciar el servidor en el puerto especificado
-app.listen(PORT, () => {
-  console.log(`Servidor escuchando en puerto ${PORT}`);
-});
+    try {
+      // Verificar si la tabla "usuarios" existe
+      const stmt = db.prepare('SELECT name FROM sqlite_master WHERE type="table" AND name="usuarios"');
+      const tableExists = stmt.get();
+  
+      if (!tableExists) {
+        console.log('Tabla usuarios no existe');
+        return res.status(500).json({ mensaje: 'Tabla usuarios no existe' });
+      } else {
+        console.log('La tabla usuarios existe');
+      }
+  
+      // Si la tabla existe, obtenemos los usuarios
+      const usersStmt = db.prepare('SELECT * FROM usuarios');
+      const usuarios = usersStmt.all();
+  
+      res.json(usuarios);
+  
+    } catch (err) {
+      console.error('Error al obtener usuarios:', err);
+      res.status(500).json({ mensaje: 'Error al obtener usuarios', error: err.message });
+    }
+  });
+  
