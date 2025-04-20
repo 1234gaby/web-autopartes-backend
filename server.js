@@ -1,13 +1,36 @@
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const { createUser, findUserByEmail } = require('./models/User');
-const { crearPublicacion } = require('./models/Publicacion'); // ✅ importar función de publicación
-const db = require('./database'); // ✅ importar base de datos
+const { crearPublicacion, obtenerPublicaciones } = require('./models/Publicacion');
+const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Crear carpeta uploads si no existe
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+// Configurar multer
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    cb(null, uniqueName);
+  }
+});
+const upload = multer({ storage });
+
+// Middleware para JSON solo en endpoints sin archivos
 app.use(express.json());
 
 // Ruta base
@@ -48,28 +71,63 @@ app.get('/usuarios', (req, res) => {
   }
 });
 
-app.post('/publicaciones', (req, res) => {
-    try {
-      console.log('Datos recibidos:', req.body); // 👈 nuevo log
-      crearPublicacion(req.body);
-      res.status(201).json({ mensaje: 'Publicación creada' });
-    } catch (error) {
-      console.error('Error al crear publicación:', error); // 👈 más detallado
-      res.status(500).json({ mensaje: 'Error al crear la publicación', error: error.message });
-    }
-  });
+// Crear publicación con fotos
+app.post('/publicaciones', upload.array('fotos', 5), (req, res) => {
+  try {
+    const {
+      nombre_producto,
+      marca,
+      modelo,
+      precio,
+      ubicacion,
+      envio,
+      tipo_envio,
+      categoria,
+      estado,
+      codigo_serie,
+      compatibilidad,
+      marca_repuesto,
+      user_id
+    } = req.body;
+
+    const fotos = req.files.map(file => file.filename);
+    const compatibilidadParsed = JSON.parse(compatibilidad);
+
+    crearPublicacion({
+      nombre_producto,
+      marca,
+      modelo,
+      precio: parseFloat(precio),
+      ubicacion,
+      envio: envio === '1' || envio === 1,
+      tipo_envio,
+      categoria,
+      estado,
+      codigo_serie,
+      compatibilidad: compatibilidadParsed,
+      marca_repuesto,
+      fotos,
+      user_id: parseInt(user_id)
+    });
+
+    res.status(201).json({ mensaje: 'Publicación creada con éxito' });
+  } catch (error) {
+    console.error('Error al crear publicación:', error.message);
+    res.status(500).json({ mensaje: 'Error al crear publicación', error: error.message });
+  }
+});
+
 // Ver publicaciones
 app.get('/publicaciones', (req, res) => {
-    try {
-      const stmt = db.prepare('SELECT * FROM publicaciones');
-      const publicaciones = stmt.all();
-      res.json(publicaciones);
-    } catch (err) {
-      console.error('Error al obtener publicaciones:', err);
-      res.status(500).json({ mensaje: 'Error al obtener publicaciones' });
-    }
-  });
-  
+  try {
+    const publicaciones = obtenerPublicaciones();
+    res.json(publicaciones);
+  } catch (err) {
+    console.error('Error al obtener publicaciones:', err);
+    res.status(500).json({ mensaje: 'Error al obtener publicaciones' });
+  }
+});
+
 // Iniciar servidor
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
