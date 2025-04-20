@@ -1,7 +1,6 @@
-// models/Publicacion.js
 const db = require('../database');
 
-// Crear tabla de publicaciones si no existe, con el campo user_id
+// Crear tabla de publicaciones si no existe
 db.prepare(`
   CREATE TABLE IF NOT EXISTS publicaciones (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -10,15 +9,15 @@ db.prepare(`
     modelo TEXT NOT NULL,
     precio REAL NOT NULL,
     ubicacion TEXT NOT NULL,
-    envio INTEGER NOT NULL, -- 0 o 1
+    envio INTEGER NOT NULL,
     tipo_envio TEXT,
     categoria TEXT NOT NULL,
     estado TEXT NOT NULL,
     codigo_serie TEXT,
-    compatibilidad TEXT NOT NULL, -- JSON: [{ marca: "Ford", modelos: ["Fiesta", "Focus"] }]
+    compatibilidad TEXT NOT NULL,
     marca_repuesto TEXT NOT NULL,
-    fotos TEXT, -- JSON: ["foto1.jpg", "foto2.jpg", ...]
-    user_id INTEGER NOT NULL, -- Nuevo campo que referencia al ID del usuario que creó la publicación
+    fotos TEXT,
+    user_id INTEGER NOT NULL,
     FOREIGN KEY (user_id) REFERENCES users(id)
   )
 `).run();
@@ -61,8 +60,8 @@ function crearPublicacion(data) {
 
   stmt.run({
     ...data,
-    compatibilidad: JSON.stringify(data.compatibilidad),
-    fotos: JSON.stringify(data.fotos),
+    compatibilidad: JSON.stringify(data.compatibilidad || []),
+    fotos: JSON.stringify(data.fotos || []),
   });
 }
 
@@ -115,9 +114,9 @@ function modificarPublicacion(id, user_id, updatedData) {
     updatedData.categoria,
     updatedData.estado,
     updatedData.codigo_serie,
-    JSON.stringify(updatedData.compatibilidad),
+    JSON.stringify(updatedData.compatibilidad || []),
     updatedData.marca_repuesto,
-    JSON.stringify(updatedData.fotos),
+    JSON.stringify(updatedData.fotos || []),
     id,
   ]);
 }
