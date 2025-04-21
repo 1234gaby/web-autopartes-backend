@@ -58,6 +58,28 @@ app.post('/register', (req, res) => {
   }
 });
 
+// Ruta: Login de usuario
+app.post('/login', (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email y contraseña requeridos' });
+  }
+
+  try {
+    const user = db.prepare('SELECT * FROM users WHERE email = ? AND password = ?').get(email, password);
+
+    if (user) {
+      res.json({ message: 'Login exitoso', user_id: user.id });
+    } else {
+      res.status(401).json({ error: 'Credenciales incorrectas' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
+});
+
 // Ruta: Crear publicación (usa multer para imágenes)
 app.post('/publicaciones', upload.array('fotos', 5), (req, res) => {
   try {
