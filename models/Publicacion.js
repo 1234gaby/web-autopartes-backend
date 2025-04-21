@@ -24,6 +24,9 @@ db.prepare(`
 
 // Crear publicación
 function crearPublicacion(data) {
+  const compat = Array.isArray(data.compatibilidad) ? data.compatibilidad : [];
+  const fotosArray = Array.isArray(data.fotos) ? data.fotos : [];
+
   const stmt = db.prepare(`
     INSERT INTO publicaciones (
       nombre_producto,
@@ -60,8 +63,8 @@ function crearPublicacion(data) {
 
   stmt.run({
     ...data,
-    compatibilidad: JSON.stringify(data.compatibilidad || []),
-    fotos: JSON.stringify(data.fotos || []),
+    compatibilidad: JSON.stringify(compat),
+    fotos: JSON.stringify(fotosArray),
   });
 }
 
@@ -114,9 +117,9 @@ function modificarPublicacion(id, user_id, updatedData) {
     updatedData.categoria,
     updatedData.estado,
     updatedData.codigo_serie,
-    JSON.stringify(updatedData.compatibilidad || []),
+    JSON.stringify(updatedData.compatibilidad),
     updatedData.marca_repuesto,
-    JSON.stringify(updatedData.fotos || []),
+    JSON.stringify(updatedData.fotos),
     id,
   ]);
 }
