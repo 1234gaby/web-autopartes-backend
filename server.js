@@ -1,58 +1,64 @@
+// server.js
 const express = require('express');
 const cors = require('cors');
+const db = require('./database');
 const multer = require('multer');
-const fs = require('fs');
 const path = require('path');
-const { db } = require('./database');
+const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
+// Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(express.json()); // para requests con JSON
+app.use(express.urlencoded({ extended: true })); // para formularios
 
-// Middleware para servir imágenes estáticamente
+// Carpeta estática para acceder a las imágenes
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Configurar almacenamiento con multer
+// Asegurarse de que exista la carpeta de uploads
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+// Configurar multer para guardar archivos
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const dir = path.join(__dirname, 'uploads');
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir);
-    }
-    cb(null, dir);
+    cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const uniqueName = Date.now() + '-' + file.originalname;
-    cb(null, uniqueName);
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
+  }
+});
+const upload = multer({ storage: storage });
+
+// Ruta: Registro de usuario
+app.post('/register', (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email y contraseña requeridos' });
+  }
+
+  try {
+    const stmt = db.prepare('INSERT INTO users (email, password) VALUES (?, ?)');
+    stmt.run(email, password);
+    res.status(201).json({ message: 'Usuario registrado correctamente' });
+  } catch (err) {
+    if (err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+      res.status(409).json({ error: 'El email ya está registrado' });
+    } else {
+      console.error(err);
+      res.status(500).json({ error: 'Error del servidor' });
+    }
   }
 });
 
-const upload = multer({ storage });
-
-// Crear tabla publicaciones si no existe
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS publicaciones (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre_producto TEXT,
-    marca TEXT,
-    modelo TEXT,
-    precio INTEGER,
-    ubicacion TEXT,
-    envio TEXT,
-    tipo_envio TEXT,
-    categoria TEXT,
-    estado TEXT,
-    codigo_serie TEXT,
-    compatibilidad TEXT,
-    marca_repuesto TEXT,
-    fotos TEXT,
-    user_id INTEGER
-  )
-`).run();
-
-// Endpoint para crear publicación
+// Ruta: Crear publicación (usa multer para imágenes)
 app.post('/publicaciones', upload.array('fotos', 5), (req, res) => {
   try {
     const {
@@ -71,13 +77,13 @@ app.post('/publicaciones', upload.array('fotos', 5), (req, res) => {
       user_id
     } = req.body;
 
-    const fotos = req.files.map(file => file.filename); // nombres de archivos
+    const compatibilidadParsed = JSON.parse(compatibilidad || '[]');
+    const fotosPaths = req.files.map(file => file.filename);
 
     const stmt = db.prepare(`
       INSERT INTO publicaciones (
-        nombre_producto, marca, modelo, precio, ubicacion,
-        envio, tipo_envio, categoria, estado, codigo_serie,
-        compatibilidad, marca_repuesto, fotos, user_id
+        nombre_producto, marca, modelo, precio, ubicacion, envio, tipo_envio,
+        categoria, estado, codigo_serie, compatibilidad, marca_repuesto, fotos, user_id
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
@@ -85,43 +91,38 @@ app.post('/publicaciones', upload.array('fotos', 5), (req, res) => {
       nombre_producto,
       marca,
       modelo,
-      parseInt(precio),
+      parseFloat(precio),
       ubicacion,
       envio,
       tipo_envio,
       categoria,
       estado,
       codigo_serie,
-      compatibilidad, // viene como string JSON
+      JSON.stringify(compatibilidadParsed),
       marca_repuesto,
-      JSON.stringify(fotos),
-      parseInt(user_id)
+      JSON.stringify(fotosPaths),
+      user_id
     );
 
-    res.status(200).json({ mensaje: 'Publicación creada correctamente' });
+    res.status(201).json({ message: 'Publicación creada con éxito' });
+
   } catch (error) {
-    console.error('Error al crear publicación:', error.message);
-    res.status(500).json({ error: 'Error al crear publicación' });
+    console.error(error);
+    res.status(500).json({ error: 'Error al crear la publicación' });
   }
 });
 
-// Endpoint para listar publicaciones
+// Ruta: Obtener publicaciones
 app.get('/publicaciones', (req, res) => {
   try {
     const publicaciones = db.prepare('SELECT * FROM publicaciones').all();
-
-    const publicacionesConFotos = publicaciones.map(pub => ({
-      ...pub,
-      fotos: JSON.parse(pub.fotos || '[]').map(nombre => `${req.protocol}://${req.get('host')}/uploads/${nombre}`)
-    }));
-
-    res.json(publicacionesConFotos);
+    res.json(publicaciones);
   } catch (error) {
-    console.error('Error al obtener publicaciones:', error.message);
     res.status(500).json({ error: 'Error al obtener publicaciones' });
   }
 });
 
+// Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Servidor escuchando en puerto ${PORT}`);
 });
