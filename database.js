@@ -1,14 +1,13 @@
 const { Pool } = require('pg');
 
 // Mostrar la URL solo para debugging (desactivá luego en producción)
-console.log('*** DATABASE_URL env variable:', process.env.DATABASE_URL);
+if (process.env.NODE_ENV !== 'production') {
+  console.log('*** DATABASE_URL env variable:', process.env.DATABASE_URL);
+}
 
-// Crear pool de conexión usando la variable de entorno
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
 // Crear tablas si no existen
@@ -17,28 +16,28 @@ const pool = new Pool({
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
-        email TEXT UNIQUE,
-        password TEXT
+        email TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL
       );
     `);
 
     await pool.query(`
       CREATE TABLE IF NOT EXISTS publicaciones (
         id SERIAL PRIMARY KEY,
-        nombre_producto TEXT,
-        marca TEXT,
-        modelo TEXT,
-        precio REAL,
-        ubicacion TEXT,
+        nombre_producto TEXT NOT NULL,
+        marca TEXT NOT NULL,
+        modelo TEXT NOT NULL,
+        precio NUMERIC(10, 2) NOT NULL,
+        ubicacion TEXT NOT NULL,
         envio TEXT,
         tipo_envio TEXT,
-        categoria TEXT,
-        estado TEXT,
+        categoria TEXT NOT NULL,
+        estado TEXT NOT NULL,
         codigo_serie TEXT,
         compatibilidad JSON,
         marca_repuesto TEXT,
         fotos JSON,
-        user_id INTEGER REFERENCES users(id)
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
       );
     `);
 
@@ -49,5 +48,3 @@ const pool = new Pool({
 })();
 
 module.exports = pool;
-
-
