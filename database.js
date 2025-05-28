@@ -1,13 +1,13 @@
-// database.js
 const { Pool } = require('pg');
 
-// URL de conexión a tu base de datos en Render
-const connectionString = 'postgresql://autopartes_db_user:9HZDmKwGwlREKvUQJlfDbPE277rxA0vh@dpg-d0r6hd15pdvs73dn4js0-a.render.com:5432/autopartes_db';
+// Mostrar la URL solo para debugging (desactivá luego en producción)
+console.log('*** DATABASE_URL env variable:', process.env.DATABASE_URL);
 
+// Crear pool de conexión usando la variable de entorno
 const pool = new Pool({
-  connectionString,
+  connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false // necesario para Render
+    rejectUnauthorized: false
   }
 });
 
@@ -42,10 +42,12 @@ const pool = new Pool({
       );
     `);
 
-    console.log('Tablas verificadas o creadas correctamente');
+    console.log('✅ Tablas verificadas o creadas correctamente');
   } catch (err) {
-    console.error('Error creando/verificando tablas:', err);
+    console.error('❌ Error creando/verificando tablas:', err);
   }
 })();
 
 module.exports = pool;
+
+
