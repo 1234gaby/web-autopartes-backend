@@ -1,13 +1,20 @@
+// database.js
 const { Pool } = require('pg');
+const dotenv = require('dotenv');
 
-// Mostrar la URL solo para debugging (desactivá luego en producción)
+// Cargar las variables del archivo .env
+dotenv.config();
+
+// Mostrar la URL solo para debugging (desactivalo luego en producción)
 if (process.env.NODE_ENV !== 'production') {
   console.log('*** DATABASE_URL env variable:', process.env.DATABASE_URL);
 }
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 // Crear tablas si no existen
