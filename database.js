@@ -24,7 +24,15 @@ const pool = new Pool({
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL
+        password TEXT NOT NULL,
+        tipo_cuenta TEXT NOT NULL,
+        nombre TEXT,
+        apellido TEXT,
+        nombre_local TEXT,
+        localidad TEXT,
+        dni TEXT,
+        constancia_afip_url TEXT,
+        certificado_estudio_url TEXT
       );
     `);
 
@@ -36,7 +44,7 @@ const pool = new Pool({
         modelo TEXT NOT NULL,
         precio NUMERIC(10, 2) NOT NULL,
         ubicacion TEXT NOT NULL,
-        envio TEXT,
+        envio BOOLEAN,
         tipo_envio TEXT,
         categoria TEXT NOT NULL,
         estado TEXT NOT NULL,
