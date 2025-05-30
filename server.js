@@ -10,8 +10,13 @@ const cloudinary = require('./cloudinaryConfig');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// ✅ Configuración de CORS para permitir acceso desde el frontend
+app.use(cors({
+  origin: 'http://localhost:3000',
+  credentials: true
+}));
+
 // Middlewares
-app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -264,6 +269,7 @@ app.post(
   }
 );
 
+// 🟢 Arrancar el servidor
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
