@@ -8,19 +8,17 @@ const pool = require('./database');
 const cloudinary = require('./cloudinaryConfig');
 
 const app = express();
-// Cambié el puerto default a 3001 para evitar choque con frontend en 3000
 const PORT = process.env.PORT || 3001;
 
-// Middlewares globales
+// Middlewares
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Multer para archivos temporales
 const upload = multer({ dest: 'tmp/' });
 
 /**
- * REGISTRO DE USUARIOS (Mecánico o Vendedor)
+ * Registro de usuarios (Mecánico o Vendedor)
  */
 app.post(
   '/register',
@@ -68,8 +66,8 @@ app.post(
 
       const result = await pool.query(
         `INSERT INTO users 
-        (email, password, tipo_cuenta, nombre, apellido, nombre_local, localidad, dni, constancia_afip_url, certificado_estudio_url)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+          (email, password, tipo_cuenta, nombre, apellido, nombre_local, localidad, dni, constancia_afip_url, certificado_estudio_url)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
         [
           email,
           password,
@@ -100,7 +98,7 @@ app.post(
 );
 
 /**
- * LOGIN
+ * Login
  */
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -126,7 +124,7 @@ app.post('/login', async (req, res) => {
 });
 
 /**
- * CREAR PUBLICACIÓN
+ * Crear publicación
  */
 app.post('/publicaciones', upload.array('fotos', 5), async (req, res) => {
   try {
@@ -188,7 +186,7 @@ app.post('/publicaciones', upload.array('fotos', 5), async (req, res) => {
 });
 
 /**
- * OBTENER TODAS LAS PUBLICACIONES
+ * Obtener todas las publicaciones
  */
 app.get('/publicaciones', async (req, res) => {
   try {
@@ -201,7 +199,7 @@ app.get('/publicaciones', async (req, res) => {
 });
 
 /**
- * OBTENER DATOS DE UN USUARIO
+ * Obtener datos de un usuario
  */
 app.get('/usuarios/:id', async (req, res) => {
   const { id } = req.params;
@@ -218,7 +216,7 @@ app.get('/usuarios/:id', async (req, res) => {
 });
 
 /**
- * SUBIR DOCUMENTOS DE UN USUARIO
+ * Subir documentos de un usuario
  */
 app.post(
   '/usuarios/:id/documentos',
@@ -266,9 +264,6 @@ app.post(
   }
 );
 
-/**
- * INICIAR SERVIDOR
- */
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });

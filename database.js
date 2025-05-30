@@ -1,11 +1,9 @@
-// database.js
 const { Pool } = require('pg');
 const dotenv = require('dotenv');
 
-// Cargar las variables del archivo .env
+// Cargar variables de entorno
 dotenv.config();
 
-// Mostrar la URL solo para debugging (desactivalo luego en producción)
 if (process.env.NODE_ENV !== 'production') {
   console.log('*** DATABASE_URL env variable:', process.env.DATABASE_URL);
 }
@@ -17,7 +15,7 @@ const pool = new Pool({
   },
 });
 
-// Crear tablas si no existen
+// Crear tablas si no existen, incluyendo campos para aprobación de documentos
 (async () => {
   try {
     await pool.query(`
@@ -32,7 +30,9 @@ const pool = new Pool({
         localidad TEXT,
         dni TEXT,
         constancia_afip_url TEXT,
-        certificado_estudio_url TEXT
+        certificado_estudio_url TEXT,
+        aprobado_constancia_afip BOOLEAN DEFAULT FALSE,
+        aprobado_certificado_estudio BOOLEAN DEFAULT FALSE
       );
     `);
 
