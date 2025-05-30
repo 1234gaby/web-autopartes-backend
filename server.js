@@ -8,7 +8,8 @@ const pool = require('./database');
 const cloudinary = require('./cloudinaryConfig');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+// Cambié el puerto default a 3001 para evitar choque con frontend en 3000
+const PORT = process.env.PORT || 3001;
 
 // Middlewares globales
 app.use(cors());
@@ -20,8 +21,6 @@ const upload = multer({ dest: 'tmp/' });
 
 /**
  * REGISTRO DE USUARIOS (Mecánico o Vendedor)
- * Campos obligatorios: email, password, tipoCuenta
- * Archivos opcionales: constanciaAfip (vendedor), certificadoEstudio (mecánico)
  */
 app.post(
   '/register',
@@ -49,7 +48,6 @@ app.post(
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
 
-      // Subir constancia de AFIP (vendedor)
       if (req.files?.constanciaAfip) {
         const archivo = req.files.constanciaAfip[0];
         const result = await cloudinary.uploader.upload(archivo.path, {
@@ -59,7 +57,6 @@ app.post(
         fs.unlinkSync(archivo.path);
       }
 
-      // Subir certificado de estudios (mecánico)
       if (req.files?.certificadoEstudio) {
         const archivo = req.files.certificadoEstudio[0];
         const result = await cloudinary.uploader.upload(archivo.path, {
@@ -202,6 +199,72 @@ app.get('/publicaciones', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener publicaciones' });
   }
 });
+
+/**
+ * OBTENER DATOS DE UN USUARIO
+ */
+app.get('/usuarios/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener usuario' });
+  }
+});
+
+/**
+ * SUBIR DOCUMENTOS DE UN USUARIO
+ */
+app.post(
+  '/usuarios/:id/documentos',
+  upload.fields([
+    { name: 'constanciaAfip', maxCount: 1 },
+    { name: 'certificadoEstudio', maxCount: 1 },
+  ]),
+  async (req, res) => {
+    const { id } = req.params;
+    try {
+      let constanciaAfipUrl = null;
+      let certificadoEstudioUrl = null;
+
+      if (req.files?.constanciaAfip) {
+        const archivo = req.files.constanciaAfip[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      if (req.files?.certificadoEstudio) {
+        const archivo = req.files.certificadoEstudio[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+        });
+        certificadoEstudioUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      const result = await pool.query(
+        `UPDATE users SET
+          constancia_afip_url = COALESCE($1, constancia_afip_url),
+          certificado_estudio_url = COALESCE($2, certificado_estudio_url)
+         WHERE id = $3 RETURNING *`,
+        [constanciaAfipUrl, certificadoEstudioUrl, id]
+      );
+
+      res.json(result.rows[0]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Error al actualizar documentos' });
+    }
+  }
+);
 
 /**
  * INICIAR SERVIDOR
