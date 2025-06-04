@@ -28,7 +28,6 @@ app.use(cors({
   credentials: true
 }));
 
-
 // Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -125,13 +124,18 @@ app.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Email y contraseña requeridos' });
 
   try {
+    // Selecciona también tipo_cuenta para enviarlo al frontend
     const result = await pool.query(
-      'SELECT id FROM users WHERE email = $1 AND password = $2',
+      'SELECT id, tipo_cuenta FROM users WHERE email = $1 AND password = $2',
       [email, password]
     );
 
     if (result.rows.length > 0) {
-      res.json({ message: 'Login exitoso', user_id: result.rows[0].id });
+      res.json({
+        message: 'Login exitoso',
+        user_id: result.rows[0].id,
+        tipoCuenta: result.rows[0].tipo_cuenta // <-- así lo espera tu frontend
+      });
     } else {
       res.status(401).json({ error: 'Credenciales incorrectas' });
     }
