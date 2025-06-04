@@ -11,10 +11,23 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ✅ Configuración de CORS para permitir acceso desde el frontend
+const allowedOrigins = [
+  'http://localhost:3000',
+  'https://web-autopartes.vercel.app'
+];
+
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Permitir peticiones sin origin (como en Postman) o si el origin está en la lista
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
 }));
+
 
 // Middlewares
 app.use(express.json());
