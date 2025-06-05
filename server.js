@@ -52,6 +52,7 @@ app.post(
       nombreLocal,
       localidad,
       dni,
+      telefono // <-- AGREGADO
     } = req.body;
 
     if (!email || !password || !tipoCuenta) {
@@ -82,8 +83,8 @@ app.post(
 
       const result = await pool.query(
         `INSERT INTO users 
-          (email, password, tipo_cuenta, nombre, apellido, nombre_local, localidad, dni, constancia_afip_url, certificado_estudio_url)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+          (email, password, tipo_cuenta, nombre, apellido, nombre_local, localidad, dni, telefono, constancia_afip_url, certificado_estudio_url)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
         [
           email,
           password,
@@ -93,6 +94,7 @@ app.post(
           nombreLocal || null,
           localidad || null,
           dni || null,
+          telefono || null, // <-- AGREGADO
           constanciaAfipUrl,
           certificadoEstudioUrl,
         ]
@@ -383,7 +385,7 @@ app.get('/usuarios/:id', async (req, res) => {
 });
 
 /**
- * Editar datos de usuario (nombre, apellido, email, contraseña, archivos)
+ * Editar datos de usuario (nombre, apellido, email, contraseña, telefono, archivos)
  */
 app.put(
   '/usuarios/:id',
@@ -393,7 +395,7 @@ app.put(
   ]),
   async (req, res) => {
     const { id } = req.params;
-    const { nombre, apellido, email, contrasena } = req.body;
+    const { nombre, apellido, email, contrasena, telefono } = req.body; // <-- AGREGADO telefono
 
     try {
       // Buscar usuario
@@ -430,15 +432,17 @@ app.put(
           apellido = COALESCE($2, apellido),
           email = COALESCE($3, email),
           password = COALESCE($4, password),
-          constancia_afip_url = COALESCE($5, constancia_afip_url),
-          certificado_estudio_url = COALESCE($6, certificado_estudio_url)
-         WHERE id = $7
+          telefono = COALESCE($5, telefono),
+          constancia_afip_url = COALESCE($6, constancia_afip_url),
+          certificado_estudio_url = COALESCE($7, certificado_estudio_url)
+         WHERE id = $8
          RETURNING *`,
         [
           nombre || null,
           apellido || null,
           email || null,
           contrasena || null,
+          telefono || null, // <-- AGREGADO
           constanciaAfipUrl,
           certificadoEstudioUrl,
           id
