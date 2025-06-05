@@ -19,7 +19,6 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permitir peticiones sin origin (como en Postman) o si el origin está en la lista
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -29,7 +28,6 @@ app.use(cors({
   credentials: true
 }));
 
-// Middlewares
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -125,7 +123,6 @@ app.post('/login', async (req, res) => {
     return res.status(400).json({ error: 'Email y contraseña requeridos' });
 
   try {
-    // Selecciona también tipo_cuenta para enviarlo al frontend
     const result = await pool.query(
       'SELECT id, tipo_cuenta FROM users WHERE email = $1 AND password = $2',
       [email, password]
@@ -135,7 +132,7 @@ app.post('/login', async (req, res) => {
       res.json({
         message: 'Login exitoso',
         user_id: result.rows[0].id,
-        tipoCuenta: result.rows[0].tipo_cuenta // <-- así lo espera tu frontend
+        tipoCuenta: result.rows[0].tipo_cuenta
       });
     } else {
       res.status(401).json({ error: 'Credenciales incorrectas' });
@@ -297,7 +294,6 @@ app.post('/recuperacion', async (req, res) => {
   }
 
   try {
-    // Verifica que el email y el dni coincidan con un usuario
     const user = await pool.query(
       'SELECT id FROM users WHERE email = $1 AND dni = $2',
       [email, dni]
@@ -307,7 +303,6 @@ app.post('/recuperacion', async (req, res) => {
       return res.status(404).json({ error: 'No se encontró usuario con ese email y DNI' });
     }
 
-    // Envía el correo de recuperación
     await sendRecoveryEmail(email);
 
     res.json({ message: 'Email de recuperación enviado. Revisa tu bandeja de entrada.' });
@@ -326,7 +321,6 @@ app.post('/actualizar-password', async (req, res) => {
   }
 
   try {
-    // Verificamos que el email y dni coincidan con un usuario
     const user = await pool.query(
       'SELECT id FROM users WHERE email = $1 AND dni = $2',
       [email, dni]
@@ -336,7 +330,6 @@ app.post('/actualizar-password', async (req, res) => {
       return res.status(404).json({ error: 'No se encontró usuario con ese email y DNI' });
     }
 
-    // Actualizamos la contraseña (en texto plano según tu idea)
     await pool.query(
       'UPDATE users SET password = $1 WHERE id = $2',
       [nuevaPassword, user.rows[0].id]
@@ -344,7 +337,7 @@ app.post('/actualizar-password', async (req, res) => {
 
     res.json({ message: 'Contraseña actualizada correctamente' });
   } catch (error) {
-    console.error(error);
+    console.error('Error al actualizar contraseña:', error);
     res.status(500).json({ error: 'Error al actualizar contraseña' });
   }
 });
