@@ -385,6 +385,26 @@ app.get('/usuarios/:id', async (req, res) => {
 });
 
 /**
+ * Obtener cantidad de ventas de un usuario en los últimos 30 días
+ */
+app.get('/usuarios/:id/ventas-ultimos-30', async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Suponiendo que tienes una tabla "ventas" con un campo "user_id" y "fecha"
+    // Si la tabla se llama diferente, ajusta el nombre
+    const result = await pool.query(
+      `SELECT COUNT(*) FROM ventas 
+       WHERE user_id = $1 AND fecha >= NOW() - INTERVAL '30 days'`,
+      [id]
+    );
+    res.json({ ventasUltimos30: parseInt(result.rows[0].count, 10) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener ventas de los últimos 30 días' });
+  }
+});
+
+/**
  * Editar datos de usuario (nombre, apellido, email, contraseña, telefono, archivos)
  */
 app.put(
