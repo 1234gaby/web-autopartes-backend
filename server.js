@@ -236,7 +236,81 @@ app.get('/usuarios/:id', async (req, res) => {
 });
 
 /**
- * Subir documentos de un usuario
+ * Editar datos de usuario (nombre, apellido, email, contraseña, archivos)
+ */
+app.put(
+  '/usuarios/:id',
+  upload.fields([
+    { name: 'constanciaAfip', maxCount: 1 },
+    { name: 'certificadoEstudio', maxCount: 1 },
+  ]),
+  async (req, res) => {
+    const { id } = req.params;
+    const { nombre, apellido, email, contrasena } = req.body;
+
+    try {
+      // Buscar usuario
+      const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+
+      let constanciaAfipUrl = null;
+      let certificadoEstudioUrl = null;
+
+      if (req.files?.constanciaAfip) {
+        const archivo = req.files.constanciaAfip[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      if (req.files?.certificadoEstudio) {
+        const archivo = req.files.certificadoEstudio[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+        });
+        certificadoEstudioUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      // Actualizar usuario
+      const result = await pool.query(
+        `UPDATE users SET
+          nombre = COALESCE($1, nombre),
+          apellido = COALESCE($2, apellido),
+          email = COALESCE($3, email),
+          password = COALESCE($4, password),
+          constancia_afip_url = COALESCE($5, constancia_afip_url),
+          certificado_estudio_url = COALESCE($6, certificado_estudio_url)
+         WHERE id = $7
+         RETURNING *`,
+        [
+          nombre || null,
+          apellido || null,
+          email || null,
+          contrasena || null,
+          constanciaAfipUrl,
+          certificadoEstudioUrl,
+          id
+        ]
+      );
+
+      res.json({
+        message: 'Perfil actualizado correctamente',
+        usuario: result.rows[0]
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Error al actualizar usuario' });
+    }
+  }
+);
+
+/**
+ * Subir documentos de un usuario (solo archivos, sin datos)
  */
 app.post(
   '/usuarios/:id/documentos',
@@ -285,7 +359,6 @@ app.post(
 );
 
 // --- Recuperación de contraseña ---
-// Solicitar recuperación (verifica email y dni, y envía email si coinciden)
 app.post('/recuperacion', async (req, res) => {
   const { email, dni } = req.body;
 
