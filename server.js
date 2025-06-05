@@ -279,7 +279,7 @@ app.delete('/publicaciones/:id', async (req, res) => {
 });
 
 /**
- * Editar publicación (datos + imágenes)
+ * Editar publicación (datos + imágenes + compatibilidad)
  * Espera: campos editables, nuevasFotos (array de files), imagenesAEliminar (array de urls)
  */
 app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) => {
@@ -292,6 +292,9 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
     ubicacion,
     categoria,
     estado,
+    codigo_serie,
+    compatibilidad,
+    marca_repuesto,
     imagenesAEliminar
   } = req.body;
 
@@ -324,7 +327,7 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
       }
     }
 
-    // Actualizar publicación
+    // Actualizar publicación (ahora incluye compatibilidad, codigo_serie y marca_repuesto)
     await pool.query(
       `UPDATE publicaciones SET
         nombre_producto = COALESCE($1, nombre_producto),
@@ -334,8 +337,11 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
         ubicacion = COALESCE($5, ubicacion),
         categoria = COALESCE($6, categoria),
         estado = COALESCE($7, estado),
-        fotos = $8
-      WHERE id = $9`,
+        fotos = $8,
+        codigo_serie = COALESCE($9, codigo_serie),
+        compatibilidad = COALESCE($10, compatibilidad),
+        marca_repuesto = COALESCE($11, marca_repuesto)
+      WHERE id = $12`,
       [
         nombre_producto || null,
         marca || null,
@@ -345,6 +351,9 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
         categoria || null,
         estado || null,
         JSON.stringify(nuevasFotos),
+        codigo_serie || null,
+        compatibilidad ? JSON.stringify(JSON.parse(compatibilidad)) : null,
+        marca_repuesto || null,
         id
       ]
     );
