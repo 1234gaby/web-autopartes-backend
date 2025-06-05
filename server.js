@@ -6,7 +6,7 @@ const multer = require('multer');
 const fs = require('fs');
 const pool = require('./database');
 const cloudinary = require('./cloudinaryConfig');
-const { sendRecoveryEmail } = require('./mailer'); // <-- Importa la función de mailer
+const { sendRecoveryEmail } = require('./mailer');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
