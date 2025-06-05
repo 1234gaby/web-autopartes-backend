@@ -368,6 +368,63 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
 });
 
 /**
+ * Registrar una venta
+ */
+app.post('/ventas', async (req, res) => {
+  const { vendedor_id, comprador_id, publicacion_id, cantidad, monto } = req.body;
+  try {
+    const result = await pool.query(
+      `INSERT INTO ventas (vendedor_id, comprador_id, publicacion_id, cantidad, monto, fecha)
+       VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
+      [vendedor_id, comprador_id, publicacion_id, cantidad, monto]
+    );
+    res.status(201).json({ message: 'Venta registrada', venta: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al registrar la venta' });
+  }
+});
+
+/**
+ * Actualizar el cashback del usuario
+ */
+app.put('/usuarios/:id/cashback', async (req, res) => {
+  const { id } = req.params;
+  const { cashback } = req.body;
+  try {
+    const result = await pool.query(
+      'UPDATE users SET cashback = $1 WHERE id = $2 RETURNING *',
+      [cashback, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    res.json({ message: 'Cashback actualizado', usuario: result.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al actualizar cashback' });
+  }
+});
+
+/**
+ * Obtener cantidad de compras de un usuario en los últimos 30 días
+ */
+app.get('/usuarios/:id/compras-ultimos-30', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*) FROM ventas 
+       WHERE comprador_id = $1 AND fecha >= NOW() - INTERVAL '30 days'`,
+      [id]
+    );
+    res.json({ comprasUltimos30: parseInt(result.rows[0].count, 10) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener compras de los últimos 30 días' });
+  }
+});
+
+/**
  * Obtener datos de un usuario
  */
 app.get('/usuarios/:id', async (req, res) => {
@@ -390,11 +447,9 @@ app.get('/usuarios/:id', async (req, res) => {
 app.get('/usuarios/:id/ventas-ultimos-30', async (req, res) => {
   const { id } = req.params;
   try {
-    // Suponiendo que tienes una tabla "ventas" con un campo "user_id" y "fecha"
-    // Si la tabla se llama diferente, ajusta el nombre
     const result = await pool.query(
       `SELECT COUNT(*) FROM ventas 
-       WHERE user_id = $1 AND fecha >= NOW() - INTERVAL '30 days'`,
+       WHERE vendedor_id = $1 AND fecha >= NOW() - INTERVAL '30 days'`,
       [id]
     );
     res.json({ ventasUltimos30: parseInt(result.rows[0].count, 10) });
