@@ -6,6 +6,7 @@ const multer = require('multer');
 const fs = require('fs');
 const pool = require('./database');
 const cloudinary = require('./cloudinaryConfig');
+const { sendRecoveryEmail } = require('./mailer'); // <-- Importa la función de mailer
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -285,6 +286,68 @@ app.post(
     }
   }
 );
+
+// --- Recuperación de contraseña ---
+// Solicitar recuperación (verifica email y dni, y envía email si coinciden)
+app.post('/recuperacion', async (req, res) => {
+  const { email, dni } = req.body;
+
+  if (!email || !dni) {
+    return res.status(400).json({ error: 'Email y DNI requeridos' });
+  }
+
+  try {
+    // Verifica que el email y el dni coincidan con un usuario
+    const user = await pool.query(
+      'SELECT id FROM users WHERE email = $1 AND dni = $2',
+      [email, dni]
+    );
+
+    if (user.rows.length === 0) {
+      return res.status(404).json({ error: 'No se encontró usuario con ese email y DNI' });
+    }
+
+    // Envía el correo de recuperación
+    await sendRecoveryEmail(email);
+
+    res.json({ message: 'Email de recuperación enviado. Revisa tu bandeja de entrada.' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al enviar email' });
+  }
+});
+
+// Actualizar contraseña usando email y DNI
+app.post('/actualizar-password', async (req, res) => {
+  const { email, dni, nuevaPassword } = req.body;
+
+  if (!email || !dni || !nuevaPassword) {
+    return res.status(400).json({ error: 'Email, DNI y nueva contraseña son requeridos' });
+  }
+
+  try {
+    // Verificamos que el email y dni coincidan con un usuario
+    const user = await pool.query(
+      'SELECT id FROM users WHERE email = $1 AND dni = $2',
+      [email, dni]
+    );
+
+    if (user.rows.length === 0) {
+      return res.status(404).json({ error: 'No se encontró usuario con ese email y DNI' });
+    }
+
+    // Actualizamos la contraseña (en texto plano según tu idea)
+    await pool.query(
+      'UPDATE users SET password = $1 WHERE id = $2',
+      [nuevaPassword, user.rows[0].id]
+    );
+
+    res.json({ message: 'Contraseña actualizada correctamente' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al actualizar contraseña' });
+  }
+});
 
 // 🟢 Arrancar el servidor
 app.listen(PORT, () => {
