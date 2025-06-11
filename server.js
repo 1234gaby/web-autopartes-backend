@@ -384,7 +384,26 @@ app.post('/ventas', async (req, res) => {
     res.status(500).json({ error: 'Error al registrar la venta' });
   }
 });
-
+/**
+ * Obtener todas las compras de un usuario (ventas donde es comprador)
+ */
+app.get('/usuarios/:id/compras', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT v.*, p.nombre_producto
+       FROM ventas v
+       JOIN publicaciones p ON v.publicacion_id = p.id
+       WHERE v.comprador_id = $1
+       ORDER BY v.fecha DESC`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener compras del usuario' });
+  }
+});
 /**
  * Actualizar el cashback del usuario
  */
