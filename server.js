@@ -475,7 +475,7 @@ app.get('/usuarios/:id/ventas-ultimos-30', async (req, res) => {
 });
 
 /**
- * Editar datos de usuario (nombre, apellido, email, contraseña, telefono, archivos)
+ * Editar datos de usuario (nombre, apellido, email, contraseña, telefono, nombre_local, archivos)
  */
 app.put(
   '/usuarios/:id',
@@ -485,7 +485,8 @@ app.put(
   ]),
   async (req, res) => {
     const { id } = req.params;
-    const { nombre, apellido, email, contrasena, telefono } = req.body;
+    // AGREGA nombre_local aquí
+    const { nombre, apellido, email, contrasena, telefono, nombre_local } = req.body;
 
     try {
       const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
@@ -514,6 +515,7 @@ app.put(
         fs.unlinkSync(archivo.path);
       }
 
+      // AGREGA nombre_local en la query
       const result = await pool.query(
         `UPDATE users SET
           nombre = COALESCE($1, nombre),
@@ -521,9 +523,10 @@ app.put(
           email = COALESCE($3, email),
           password = COALESCE($4, password),
           telefono = COALESCE($5, telefono),
-          constancia_afip_url = COALESCE($6, constancia_afip_url),
-          certificado_estudio_url = COALESCE($7, certificado_estudio_url)
-         WHERE id = $8
+          nombre_local = COALESCE($6, nombre_local),
+          constancia_afip_url = COALESCE($7, constancia_afip_url),
+          certificado_estudio_url = COALESCE($8, certificado_estudio_url)
+         WHERE id = $9
          RETURNING *`,
         [
           nombre || null,
@@ -531,6 +534,7 @@ app.put(
           email || null,
           contrasena || null,
           telefono || null,
+          nombre_local || null,
           constanciaAfipUrl,
           certificadoEstudioUrl,
           id
