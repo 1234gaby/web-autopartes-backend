@@ -660,6 +660,30 @@ app.post('/actualizar-password', async (req, res) => {
   }
 });
 
+// Subir comprobante de pago para una venta
+app.post('/ventas/:id/comprobante', upload.single('comprobante'), async (req, res) => {
+  const { id } = req.params;
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
+
+    // Subir a Cloudinary
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: 'comprobantes',
+    });
+    const comprobanteUrl = result.secure_url;
+    fs.unlinkSync(req.file.path);
+
+    await pool.query(
+      'UPDATE ventas SET comprobante_pago_url = $1 WHERE id = $2',
+      [comprobanteUrl, id]
+    );
+    res.json({ message: 'Comprobante subido', comprobante_pago_url: comprobanteUrl });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al subir comprobante' });
+  }
+});
+
 // 🟢 Arrancar el servidor
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
