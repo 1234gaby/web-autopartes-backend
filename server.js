@@ -52,7 +52,7 @@ app.post(
       nombreLocal,
       localidad,
       dni,
-      telefono // <-- AGREGADO
+      telefono
     } = req.body;
 
     if (!email || !password || !tipoCuenta) {
@@ -94,7 +94,7 @@ app.post(
           nombreLocal || null,
           localidad || null,
           dni || null,
-          telefono || null, // <-- AGREGADO
+          telefono || null,
           constanciaAfipUrl,
           certificadoEstudioUrl,
         ]
@@ -166,6 +166,9 @@ app.post('/publicaciones', upload.array('fotos', 5), async (req, res) => {
       user_id,
     } = req.body;
 
+    // CONVIERTE envio a booleano REAL (corrige el error 500)
+    const envioBool = envio === 'true' || envio === true;
+
     const compatParsed = JSON.parse(compatibilidad || '[]');
 
     const fotosUrls = [];
@@ -188,7 +191,7 @@ app.post('/publicaciones', upload.array('fotos', 5), async (req, res) => {
         modelo,
         parseFloat(precio),
         ubicacion,
-        envio === 'true',
+        envioBool,
         tipo_envio,
         categoria,
         estado,
@@ -271,7 +274,6 @@ app.put('/publicaciones/:id/pausar', async (req, res) => {
 app.delete('/publicaciones/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    // Opcional: obtener fotos para borrar de cloudinary si lo deseas
     await pool.query('DELETE FROM publicaciones WHERE id = $1', [id]);
     res.json({ message: 'Publicación eliminada' });
   } catch (err) {
@@ -282,7 +284,6 @@ app.delete('/publicaciones/:id', async (req, res) => {
 
 /**
  * Editar publicación (datos + imágenes + compatibilidad)
- * Espera: campos editables, nuevasFotos (array de files), imagenesAEliminar (array de urls)
  */
 app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) => {
   const { id } = req.params;
@@ -301,7 +302,6 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
   } = req.body;
 
   try {
-    // Obtener publicación actual
     const result = await pool.query('SELECT * FROM publicaciones WHERE id = $1', [id]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Publicación no encontrada' });
@@ -310,15 +310,12 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
       ? JSON.parse(result.rows[0].fotos)
       : result.rows[0].fotos;
 
-    // Eliminar imágenes seleccionadas
     let nuevasFotos = fotosActuales;
     if (imagenesAEliminar) {
       const aEliminar = JSON.parse(imagenesAEliminar);
       nuevasFotos = fotosActuales.filter(f => !aEliminar.includes(f));
-      // Opcional: borrar de cloudinary
     }
 
-    // Subir nuevas imágenes
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
         const uploadResult = await cloudinary.uploader.upload(file.path, {
@@ -329,7 +326,6 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
       }
     }
 
-    // Actualizar publicación (ahora incluye compatibilidad, codigo_serie y marca_repuesto)
     await pool.query(
       `UPDATE publicaciones SET
         nombre_producto = COALESCE($1, nombre_producto),
@@ -489,10 +485,9 @@ app.put(
   ]),
   async (req, res) => {
     const { id } = req.params;
-    const { nombre, apellido, email, contrasena, telefono } = req.body; // <-- AGREGADO telefono
+    const { nombre, apellido, email, contrasena, telefono } = req.body;
 
     try {
-      // Buscar usuario
       const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
       if (userResult.rows.length === 0) {
         return res.status(404).json({ error: 'Usuario no encontrado' });
@@ -519,7 +514,6 @@ app.put(
         fs.unlinkSync(archivo.path);
       }
 
-      // Actualizar usuario
       const result = await pool.query(
         `UPDATE users SET
           nombre = COALESCE($1, nombre),
@@ -536,7 +530,7 @@ app.put(
           apellido || null,
           email || null,
           contrasena || null,
-          telefono || null, // <-- AGREGADO
+          telefono || null,
           constanciaAfipUrl,
           certificadoEstudioUrl,
           id
@@ -666,7 +660,6 @@ app.post('/ventas/:id/comprobante', upload.single('comprobante'), async (req, re
   try {
     if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
 
-    // Subir a Cloudinary
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'comprobantes',
     });
