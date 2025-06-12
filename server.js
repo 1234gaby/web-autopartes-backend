@@ -387,9 +387,9 @@ app.get('/usuarios/:id/compras', async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      `SELECT v.*, p.nombre_producto, p.envio, p.tipo_envio,
+      `SELECT v.*, p.nombre_producto, p.envio, p.tipo_envio
        FROM ventas v
-       JOIN publicaciones p ON v.publicacion_id = p.id
+       LEFT JOIN publicaciones p ON v.publicacion_id = p.id
        WHERE v.comprador_id = $1
        ORDER BY v.fecha DESC`,
       [id]
