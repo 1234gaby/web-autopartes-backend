@@ -33,22 +33,24 @@ app.use(express.urlencoded({ extended: true }));
 
 const upload = multer({ dest: 'tmp/' });
 
-// Función para subir archivos a Cloudinary y aceptar PDF correctamente
-async function uploadToCloudinary(archivo, folder) {
-  const esPDF = archivo.mimetype === 'application/pdf';
-  const result = await cloudinary.uploader.upload(archivo.path, {
-    folder,
-    resource_type: esPDF ? 'raw' : 'auto',
-  });
-  fs.unlinkSync(archivo.path);
-  return result.secure_url;
-}
+/**
+ * Obtener todos los usuarios (para administración)
+ */
+app.get('/usuarios', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM users');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener usuarios' });
+  }
+});
 
 /**
  * Registro de usuarios (Mecánico o Vendedor)
  * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
  * Guarda certificadoEstudio en certificado_estudio_url
- * Permite PDF usando resource_type: 'raw'
+ * Permite PDF usando resource_type: 'auto'
  */
 app.post(
   '/register',
@@ -77,21 +79,44 @@ app.post(
     try {
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
+      let certificadoTrabajoUrl = null;
 
+      // Si sube constanciaAfip, se guarda ahí
       if (req.files?.constanciaAfip) {
-        constanciaAfipUrl = await uploadToCloudinary(req.files.constanciaAfip[0], 'documentos');
+        const archivo = req.files.constanciaAfip[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto', // Permite PDF
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
       }
+
+      // Si sube certificadoTrabajo (ARCA), se guarda en certificadoTrabajoUrl
       if (req.files?.certificadoTrabajo) {
-        constanciaAfipUrl = await uploadToCloudinary(req.files.certificadoTrabajo[0], 'documentos');
+        const archivo = req.files.certificadoTrabajo[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto', // Permite PDF
+        });
+        certificadoTrabajoUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
       }
+
       if (req.files?.certificadoEstudio) {
-        certificadoEstudioUrl = await uploadToCloudinary(req.files.certificadoEstudio[0], 'documentos');
+        const archivo = req.files.certificadoEstudio[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto', // Permite PDF
+        });
+        certificadoEstudioUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
       }
 
       const result = await pool.query(
         `INSERT INTO users 
-          (email, password, tipo_cuenta, nombre, apellido, nombre_local, localidad, dni, telefono, constancia_afip_url, certificado_estudio_url)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+          (email, password, tipo_cuenta, nombre, apellido, nombre_local, localidad, dni, telefono, constancia_afip_url, certificado_estudio_url, certificado_trabajo_url)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
         [
           email,
           password,
@@ -104,6 +129,7 @@ app.post(
           telefono || null,
           constanciaAfipUrl,
           certificadoEstudioUrl,
+          certificadoTrabajoUrl,
         ]
       );
 
@@ -180,10 +206,9 @@ app.post('/publicaciones', upload.array('fotos', 5), async (req, res) => {
 
     const fotosUrls = [];
     for (const file of req.files) {
-      const esPDF = file.mimetype === 'application/pdf';
       const result = await cloudinary.uploader.upload(file.path, {
         folder: 'autopartes',
-        resource_type: esPDF ? 'raw' : 'auto',
+        resource_type: 'auto', // Por si suben PDF por error
       });
       fotosUrls.push(result.secure_url);
       fs.unlinkSync(file.path);
@@ -329,10 +354,9 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
 
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
-        const esPDF = file.mimetype === 'application/pdf';
         const uploadResult = await cloudinary.uploader.upload(file.path, {
           folder: 'autopartes',
-          resource_type: esPDF ? 'raw' : 'auto',
+          resource_type: 'auto', // Por si suben PDF por error
         });
         nuevasFotos.push(uploadResult.secure_url);
         fs.unlinkSync(file.path);
@@ -548,7 +572,7 @@ app.get('/usuarios/:id/ventas-ultimos-30', async (req, res) => {
  * Editar datos de usuario (nombre, apellido, email, contraseña, telefono, nombre_local, archivos)
  * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
  * Guarda certificadoEstudio en certificado_estudio_url
- * Permite PDF usando resource_type: 'raw'
+ * Permite PDF usando resource_type: 'auto'
  */
 app.put(
   '/usuarios/:id',
@@ -559,7 +583,22 @@ app.put(
   ]),
   async (req, res) => {
     const { id } = req.params;
-    const { nombre, apellido, email, contrasena, telefono, nombre_local } = req.body;
+    const {
+      nombre,
+      apellido,
+      email,
+      contrasena,
+      telefono,
+      nombre_local,
+      aprobado_constancia_afip,
+      aprobado_certificado_estudio,
+      aprobado_certificado_trabajo,
+      cashback,
+      tipo_cuenta,
+      dni,
+      localidad,
+      password
+    } = req.body;
 
     try {
       const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
@@ -569,15 +608,36 @@ app.put(
 
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
+      let certificadoTrabajoUrl = null;
 
       if (req.files?.constanciaAfip) {
-        constanciaAfipUrl = await uploadToCloudinary(req.files.constanciaAfip[0], 'documentos');
+        const archivo = req.files.constanciaAfip[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto', // Permite PDF
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
       }
+
       if (req.files?.certificadoTrabajo) {
-        constanciaAfipUrl = await uploadToCloudinary(req.files.certificadoTrabajo[0], 'documentos');
+        const archivo = req.files.certificadoTrabajo[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto', // Permite PDF
+        });
+        certificadoTrabajoUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
       }
+
       if (req.files?.certificadoEstudio) {
-        certificadoEstudioUrl = await uploadToCloudinary(req.files.certificadoEstudio[0], 'documentos');
+        const archivo = req.files.certificadoEstudio[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto', // Permite PDF
+        });
+        certificadoEstudioUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
       }
 
       const result = await pool.query(
@@ -589,18 +649,34 @@ app.put(
           telefono = COALESCE($5, telefono),
           nombre_local = COALESCE($6, nombre_local),
           constancia_afip_url = COALESCE($7, constancia_afip_url),
-          certificado_estudio_url = COALESCE($8, certificado_estudio_url)
-         WHERE id = $9
+          certificado_estudio_url = COALESCE($8, certificado_estudio_url),
+          certificado_trabajo_url = COALESCE($9, certificado_trabajo_url),
+          aprobado_constancia_afip = COALESCE($10, aprobado_constancia_afip),
+          aprobado_certificado_estudio = COALESCE($11, aprobado_certificado_estudio),
+          aprobado_certificado_trabajo = COALESCE($12, aprobado_certificado_trabajo),
+          cashback = COALESCE($13, cashback),
+          tipo_cuenta = COALESCE($14, tipo_cuenta),
+          dni = COALESCE($15, dni),
+          localidad = COALESCE($16, localidad)
+         WHERE id = $17
          RETURNING *`,
         [
           nombre || null,
           apellido || null,
           email || null,
-          contrasena || null,
+          password || contrasena || null,
           telefono || null,
           nombre_local || null,
           constanciaAfipUrl,
           certificadoEstudioUrl,
+          certificadoTrabajoUrl,
+          aprobado_constancia_afip !== undefined ? aprobado_constancia_afip : null,
+          aprobado_certificado_estudio !== undefined ? aprobado_certificado_estudio : null,
+          aprobado_certificado_trabajo !== undefined ? aprobado_certificado_trabajo : null,
+          cashback || null,
+          tipo_cuenta || null,
+          dni || null,
+          localidad || null,
           id
         ]
       );
@@ -620,7 +696,7 @@ app.put(
  * Subir documentos de un usuario (solo archivos, sin datos)
  * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
  * Guarda certificadoEstudio en certificado_estudio_url
- * Permite PDF usando resource_type: 'raw'
+ * Permite PDF usando resource_type: 'auto'
  */
 app.post(
   '/usuarios/:id/documentos',
@@ -634,23 +710,45 @@ app.post(
     try {
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
+      let certificadoTrabajoUrl = null;
 
       if (req.files?.constanciaAfip) {
-        constanciaAfipUrl = await uploadToCloudinary(req.files.constanciaAfip[0], 'documentos');
+        const archivo = req.files.constanciaAfip[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto', // Permite PDF
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
       }
+
       if (req.files?.certificadoTrabajo) {
-        constanciaAfipUrl = await uploadToCloudinary(req.files.certificadoTrabajo[0], 'documentos');
+        const archivo = req.files.certificadoTrabajo[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto', // Permite PDF
+        });
+        certificadoTrabajoUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
       }
+
       if (req.files?.certificadoEstudio) {
-        certificadoEstudioUrl = await uploadToCloudinary(req.files.certificadoEstudio[0], 'documentos');
+        const archivo = req.files.certificadoEstudio[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto', // Permite PDF
+        });
+        certificadoEstudioUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
       }
 
       const result = await pool.query(
         `UPDATE users SET
           constancia_afip_url = COALESCE($1, constancia_afip_url),
-          certificado_estudio_url = COALESCE($2, certificado_estudio_url)
-         WHERE id = $3 RETURNING *`,
-        [constanciaAfipUrl, certificadoEstudioUrl, id]
+          certificado_estudio_url = COALESCE($2, certificado_estudio_url),
+          certificado_trabajo_url = COALESCE($3, certificado_trabajo_url)
+         WHERE id = $4 RETURNING *`,
+        [constanciaAfipUrl, certificadoEstudioUrl, certificadoTrabajoUrl, id]
       );
 
       res.json(result.rows[0]);
@@ -724,10 +822,9 @@ app.post('/ventas/:id/comprobante', upload.single('comprobante'), async (req, re
   try {
     if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
 
-    const esPDF = req.file.mimetype === 'application/pdf';
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'comprobantes',
-      resource_type: esPDF ? 'raw' : 'auto',
+      resource_type: 'auto', // Permite PDF
     });
     const comprobanteUrl = result.secure_url;
     fs.unlinkSync(req.file.path);
