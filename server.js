@@ -612,6 +612,89 @@ app.post('/ventas', async (req, res) => {
   }
 });
 
+// 🟢 NUEVO: Obtener todas las ventas con detalles de producto y emails
+app.get('/ventas-detalle', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT v.*, 
+        p.nombre_producto, 
+        u1.email AS vendedor_email, 
+        u2.email AS comprador_email
+      FROM ventas v
+      LEFT JOIN publicaciones p ON v.publicacion_id = p.id
+      LEFT JOIN users u1 ON v.vendedor_id = u1.id
+      LEFT JOIN users u2 ON v.comprador_id = u2.id
+      ORDER BY v.fecha DESC`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener ventas' });
+  }
+});
+
+// 🟢 NUEVO: Editar datos de una venta (incluye pago_recibido)
+app.put('/ventas/:id', async (req, res) => {
+  const { id } = req.params;
+  const {
+    cantidad,
+    monto,
+    localidad_envio,
+    direccion_envio,
+    altura_envio,
+    entrecalles_envio,
+    pago_recibido
+  } = req.body;
+
+  try {
+    const result = await pool.query(
+      `UPDATE ventas SET
+        cantidad = COALESCE($1, cantidad),
+        monto = COALESCE($2, monto),
+        localidad_envio = COALESCE($3, localidad_envio),
+        direccion_envio = COALESCE($4, direccion_envio),
+        altura_envio = COALESCE($5, altura_envio),
+        entrecalles_envio = COALESCE($6, entrecalles_envio),
+        pago_recibido = COALESCE($7, pago_recibido)
+      WHERE id = $8
+      RETURNING *`,
+      [
+        cantidad || null,
+        monto || null,
+        localidad_envio || null,
+        direccion_envio || null,
+        altura_envio || null,
+        entrecalles_envio || null,
+        typeof pago_recibido === 'undefined' ? null : pago_recibido,
+        id
+      ]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    // Traer detalles para devolver igual que /ventas-detalle
+    const detalle = await pool.query(
+      `SELECT v.*, 
+        p.nombre_producto, 
+        u1.email AS vendedor_email, 
+        u2.email AS comprador_email
+      FROM ventas v
+      LEFT JOIN publicaciones p ON v.publicacion_id = p.id
+      LEFT JOIN users u1 ON v.vendedor_id = u1.id
+      LEFT JOIN users u2 ON v.comprador_id = u2.id
+      WHERE v.id = $1`,
+      [id]
+    );
+
+    res.json({ message: 'Venta actualizada', venta: detalle.rows[0] });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al actualizar venta' });
+  }
+});
+
 app.get('/usuarios/:id/compras', async (req, res) => {
   const { id } = req.params;
   try {
