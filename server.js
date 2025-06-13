@@ -34,19 +34,6 @@ app.use(express.urlencoded({ extended: true }));
 const upload = multer({ dest: 'tmp/' });
 
 /**
- * Obtener todos los usuarios (para administración)
- */
-app.get('/usuarios', async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM users');
-    res.json(result.rows);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Error al obtener usuarios' });
-  }
-});
-
-/**
  * Registro de usuarios (Mecánico o Vendedor)
  * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
  * Guarda certificadoEstudio en certificado_estudio_url
@@ -79,7 +66,6 @@ app.post(
     try {
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
-      let certificadoTrabajoUrl = null;
 
       // Si sube constanciaAfip, se guarda ahí
       if (req.files?.constanciaAfip) {
@@ -92,14 +78,14 @@ app.post(
         fs.unlinkSync(archivo.path);
       }
 
-      // Si sube certificadoTrabajo (ARCA), se guarda en certificadoTrabajoUrl
+      // Si sube certificadoTrabajo (ARCA), también se guarda en constanciaAfipUrl (sobrescribe si ya había)
       if (req.files?.certificadoTrabajo) {
         const archivo = req.files.certificadoTrabajo[0];
         const result = await cloudinary.uploader.upload(archivo.path, {
           folder: 'documentos',
           resource_type: 'auto', // Permite PDF
         });
-        certificadoTrabajoUrl = result.secure_url;
+        constanciaAfipUrl = result.secure_url;
         fs.unlinkSync(archivo.path);
       }
 
@@ -115,8 +101,8 @@ app.post(
 
       const result = await pool.query(
         `INSERT INTO users 
-          (email, password, tipo_cuenta, nombre, apellido, nombre_local, localidad, dni, telefono, constancia_afip_url, certificado_estudio_url, certificado_trabajo_url)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+          (email, password, tipo_cuenta, nombre, apellido, nombre_local, localidad, dni, telefono, constancia_afip_url, certificado_estudio_url)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
         [
           email,
           password,
@@ -129,7 +115,6 @@ app.post(
           telefono || null,
           constanciaAfipUrl,
           certificadoEstudioUrl,
-          certificadoTrabajoUrl,
         ]
       );
 
@@ -583,22 +568,7 @@ app.put(
   ]),
   async (req, res) => {
     const { id } = req.params;
-    const {
-      nombre,
-      apellido,
-      email,
-      contrasena,
-      telefono,
-      nombre_local,
-      aprobado_constancia_afip,
-      aprobado_certificado_estudio,
-      aprobado_certificado_trabajo,
-      cashback,
-      tipo_cuenta,
-      dni,
-      localidad,
-      password
-    } = req.body;
+    const { nombre, apellido, email, contrasena, telefono, nombre_local } = req.body;
 
     try {
       const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
@@ -608,7 +578,6 @@ app.put(
 
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
-      let certificadoTrabajoUrl = null;
 
       if (req.files?.constanciaAfip) {
         const archivo = req.files.constanciaAfip[0];
@@ -626,7 +595,7 @@ app.put(
           folder: 'documentos',
           resource_type: 'auto', // Permite PDF
         });
-        certificadoTrabajoUrl = result.secure_url;
+        constanciaAfipUrl = result.secure_url;
         fs.unlinkSync(archivo.path);
       }
 
@@ -649,34 +618,18 @@ app.put(
           telefono = COALESCE($5, telefono),
           nombre_local = COALESCE($6, nombre_local),
           constancia_afip_url = COALESCE($7, constancia_afip_url),
-          certificado_estudio_url = COALESCE($8, certificado_estudio_url),
-          certificado_trabajo_url = COALESCE($9, certificado_trabajo_url),
-          aprobado_constancia_afip = COALESCE($10, aprobado_constancia_afip),
-          aprobado_certificado_estudio = COALESCE($11, aprobado_certificado_estudio),
-          aprobado_certificado_trabajo = COALESCE($12, aprobado_certificado_trabajo),
-          cashback = COALESCE($13, cashback),
-          tipo_cuenta = COALESCE($14, tipo_cuenta),
-          dni = COALESCE($15, dni),
-          localidad = COALESCE($16, localidad)
-         WHERE id = $17
+          certificado_estudio_url = COALESCE($8, certificado_estudio_url)
+         WHERE id = $9
          RETURNING *`,
         [
           nombre || null,
           apellido || null,
           email || null,
-          password || contrasena || null,
+          contrasena || null,
           telefono || null,
           nombre_local || null,
           constanciaAfipUrl,
           certificadoEstudioUrl,
-          certificadoTrabajoUrl,
-          aprobado_constancia_afip !== undefined ? aprobado_constancia_afip : null,
-          aprobado_certificado_estudio !== undefined ? aprobado_certificado_estudio : null,
-          aprobado_certificado_trabajo !== undefined ? aprobado_certificado_trabajo : null,
-          cashback || null,
-          tipo_cuenta || null,
-          dni || null,
-          localidad || null,
           id
         ]
       );
@@ -710,7 +663,6 @@ app.post(
     try {
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
-      let certificadoTrabajoUrl = null;
 
       if (req.files?.constanciaAfip) {
         const archivo = req.files.constanciaAfip[0];
@@ -728,7 +680,7 @@ app.post(
           folder: 'documentos',
           resource_type: 'auto', // Permite PDF
         });
-        certificadoTrabajoUrl = result.secure_url;
+        constanciaAfipUrl = result.secure_url;
         fs.unlinkSync(archivo.path);
       }
 
@@ -745,10 +697,9 @@ app.post(
       const result = await pool.query(
         `UPDATE users SET
           constancia_afip_url = COALESCE($1, constancia_afip_url),
-          certificado_estudio_url = COALESCE($2, certificado_estudio_url),
-          certificado_trabajo_url = COALESCE($3, certificado_trabajo_url)
-         WHERE id = $4 RETURNING *`,
-        [constanciaAfipUrl, certificadoEstudioUrl, certificadoTrabajoUrl, id]
+          certificado_estudio_url = COALESCE($2, certificado_estudio_url)
+         WHERE id = $3 RETURNING *`,
+        [constanciaAfipUrl, certificadoEstudioUrl, id]
       );
 
       res.json(result.rows[0]);
