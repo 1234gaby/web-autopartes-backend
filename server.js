@@ -612,14 +612,14 @@ app.post('/ventas', async (req, res) => {
   }
 });
 
-// 🟢 NUEVO: Obtener todas las ventas con detalles de producto y emails
+// 🟢 NUEVO: Obtener todas las ventas con TODOS los datos de vendedor y comprador
 app.get('/ventas-detalle', async (req, res) => {
   try {
     const result = await pool.query(
       `SELECT v.*, 
         p.nombre_producto, 
-        u1.email AS vendedor_email, 
-        u2.email AS comprador_email
+        u1.email AS vendedor_email, u1.nombre AS vendedor_nombre, u1.apellido AS vendedor_apellido, u1.telefono AS vendedor_telefono, u1.nombre_local AS vendedor_nombre_local, u1.localidad AS vendedor_localidad, u1.dni AS vendedor_dni,
+        u2.email AS comprador_email, u2.nombre AS comprador_nombre, u2.apellido AS comprador_apellido, u2.telefono AS comprador_telefono, u2.nombre_local AS comprador_nombre_local, u2.localidad AS comprador_localidad, u2.dni AS comprador_dni
       FROM ventas v
       LEFT JOIN publicaciones p ON v.publicacion_id = p.id
       LEFT JOIN users u1 ON v.vendedor_id = u1.id
@@ -678,8 +678,8 @@ app.put('/ventas/:id', async (req, res) => {
     const detalle = await pool.query(
       `SELECT v.*, 
         p.nombre_producto, 
-        u1.email AS vendedor_email, 
-        u2.email AS comprador_email
+        u1.email AS vendedor_email, u1.nombre AS vendedor_nombre, u1.apellido AS vendedor_apellido, u1.telefono AS vendedor_telefono, u1.nombre_local AS vendedor_nombre_local, u1.localidad AS vendedor_localidad, u1.dni AS vendedor_dni,
+        u2.email AS comprador_email, u2.nombre AS comprador_nombre, u2.apellido AS comprador_apellido, u2.telefono AS comprador_telefono, u2.nombre_local AS comprador_nombre_local, u2.localidad AS comprador_localidad, u2.dni AS comprador_dni
       FROM ventas v
       LEFT JOIN publicaciones p ON v.publicacion_id = p.id
       LEFT JOIN users u1 ON v.vendedor_id = u1.id
