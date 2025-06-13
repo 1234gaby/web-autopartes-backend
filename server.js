@@ -283,7 +283,7 @@ app.delete('/publicaciones/:id', async (req, res) => {
 });
 
 /**
- * Editar publicación (datos + imágenes + compatibilidad)
+ * Editar publicación (datos + imágenes + compatibilidad + envio + tipo_envio)
  */
 app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) => {
   const { id } = req.params;
@@ -298,7 +298,9 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
     codigo_serie,
     compatibilidad,
     marca_repuesto,
-    imagenesAEliminar
+    imagenesAEliminar,
+    envio,
+    tipo_envio
   } = req.body;
 
   try {
@@ -326,6 +328,12 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
       }
     }
 
+    // Convierte envio a booleano real (igual que en crear publicación)
+    let envioBool = null;
+    if (typeof envio !== 'undefined') {
+      envioBool = envio === 'true' || envio === true;
+    }
+
     await pool.query(
       `UPDATE publicaciones SET
         nombre_producto = COALESCE($1, nombre_producto),
@@ -338,8 +346,10 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
         fotos = $8,
         codigo_serie = COALESCE($9, codigo_serie),
         compatibilidad = COALESCE($10, compatibilidad),
-        marca_repuesto = COALESCE($11, marca_repuesto)
-      WHERE id = $12`,
+        marca_repuesto = COALESCE($11, marca_repuesto),
+        envio = COALESCE($12, envio),
+        tipo_envio = COALESCE($13, tipo_envio)
+      WHERE id = $14`,
       [
         nombre_producto || null,
         marca || null,
@@ -352,6 +362,8 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
         codigo_serie || null,
         compatibilidad ? JSON.stringify(JSON.parse(compatibilidad)) : null,
         marca_repuesto || null,
+        envioBool,
+        tipo_envio || null,
         id
       ]
     );
