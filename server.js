@@ -11,7 +11,6 @@ const { sendRecoveryEmail } = require('./mailer');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ✅ Configuración de CORS para permitir acceso desde el frontend
 const allowedOrigins = [
   'http://localhost:3000',
   'https://web-autopartes.vercel.app'
@@ -34,17 +33,14 @@ app.use(express.urlencoded({ extended: true }));
 const upload = multer({ dest: 'tmp/' });
 
 /**
- * Registro de usuarios (Mecánico o Vendedor)
- * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
- * Guarda certificadoEstudio en certificado_estudio_url
- * Permite PDF usando resource_type: 'auto'
+ * Registro de usuarios
  */
 app.post(
   '/register',
   upload.fields([
     { name: 'constanciaAfip', maxCount: 1 },
     { name: 'certificadoEstudio', maxCount: 1 },
-    { name: 'certificadoTrabajo', maxCount: 1 },
+    { name: 'certificadoTrabajo', maxCount: 1 }, // solo para compatibilidad
   ]),
   async (req, res) => {
     const {
@@ -67,23 +63,21 @@ app.post(
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
 
-      // Si sube constanciaAfip, se guarda ahí
       if (req.files?.constanciaAfip) {
         const archivo = req.files.constanciaAfip[0];
         const result = await cloudinary.uploader.upload(archivo.path, {
           folder: 'documentos',
-          resource_type: 'auto', // Permite PDF
+          resource_type: 'auto',
         });
         constanciaAfipUrl = result.secure_url;
         fs.unlinkSync(archivo.path);
       }
 
-      // Si sube certificadoTrabajo (ARCA), también se guarda en constanciaAfipUrl (sobrescribe si ya había)
       if (req.files?.certificadoTrabajo) {
         const archivo = req.files.certificadoTrabajo[0];
         const result = await cloudinary.uploader.upload(archivo.path, {
           folder: 'documentos',
-          resource_type: 'auto', // Permite PDF
+          resource_type: 'auto',
         });
         constanciaAfipUrl = result.secure_url;
         fs.unlinkSync(archivo.path);
@@ -93,7 +87,7 @@ app.post(
         const archivo = req.files.certificadoEstudio[0];
         const result = await cloudinary.uploader.upload(archivo.path, {
           folder: 'documentos',
-          resource_type: 'auto', // Permite PDF
+          resource_type: 'auto',
         });
         certificadoEstudioUrl = result.secure_url;
         fs.unlinkSync(archivo.path);
@@ -164,7 +158,207 @@ app.post('/login', async (req, res) => {
 });
 
 /**
- * Crear publicación
+ * Obtener todos los usuarios
+ */
+app.get('/usuarios', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM users');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener usuarios' });
+  }
+});
+
+/**
+ * Editar datos de usuario y aprobaciones
+ */
+app.put(
+  '/usuarios/:id',
+  upload.fields([
+    { name: 'constanciaAfip', maxCount: 1 },
+    { name: 'certificadoEstudio', maxCount: 1 },
+    { name: 'certificadoTrabajo', maxCount: 1 },
+  ]),
+  async (req, res) => {
+    const { id } = req.params;
+    let {
+      nombre,
+      apellido,
+      email,
+      password,
+      contrasena,
+      telefono,
+      nombre_local,
+      cashback,
+      tipo_cuenta,
+      dni,
+      localidad,
+      aprobado_constancia_afip,
+      aprobado_certificado_estudio
+    } = req.body;
+
+    const parseBool = v =>
+      v === true || v === 'true' || v === 1 || v === '1'
+        ? true
+        : v === false || v === 'false' || v === 0 || v === '0'
+        ? false
+        : null;
+
+    aprobado_constancia_afip = parseBool(aprobado_constancia_afip);
+    aprobado_certificado_estudio = parseBool(aprobado_certificado_estudio);
+
+    try {
+      const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+      if (userResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Usuario no encontrado' });
+      }
+
+      let constanciaAfipUrl = null;
+      let certificadoEstudioUrl = null;
+
+      if (req.files?.constanciaAfip) {
+        const archivo = req.files.constanciaAfip[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto',
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      if (req.files?.certificadoTrabajo) {
+        const archivo = req.files.certificadoTrabajo[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto',
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      if (req.files?.certificadoEstudio) {
+        const archivo = req.files.certificadoEstudio[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto',
+        });
+        certificadoEstudioUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      const result = await pool.query(
+        `UPDATE users SET
+          nombre = COALESCE($1, nombre),
+          apellido = COALESCE($2, apellido),
+          email = COALESCE($3, email),
+          password = COALESCE($4, password),
+          telefono = COALESCE($5, telefono),
+          nombre_local = COALESCE($6, nombre_local),
+          constancia_afip_url = COALESCE($7, constancia_afip_url),
+          certificado_estudio_url = COALESCE($8, certificado_estudio_url),
+          aprobado_constancia_afip = COALESCE($9, aprobado_constancia_afip),
+          aprobado_certificado_estudio = COALESCE($10, aprobado_certificado_estudio),
+          cashback = COALESCE($11, cashback),
+          tipo_cuenta = COALESCE($12, tipo_cuenta),
+          dni = COALESCE($13, dni),
+          localidad = COALESCE($14, localidad)
+         WHERE id = $15
+         RETURNING *`,
+        [
+          nombre || null,
+          apellido || null,
+          email || null,
+          password || contrasena || null,
+          telefono || null,
+          nombre_local || null,
+          constanciaAfipUrl,
+          certificadoEstudioUrl,
+          aprobado_constancia_afip,
+          aprobado_certificado_estudio,
+          cashback || null,
+          tipo_cuenta || null,
+          dni || null,
+          localidad || null,
+          id
+        ]
+      );
+
+      res.json({
+        message: 'Perfil actualizado correctamente',
+        usuario: result.rows[0]
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Error al actualizar usuario' });
+    }
+  }
+);
+
+/**
+ * Subir documentos de un usuario (solo archivos, sin datos)
+ */
+app.post(
+  '/usuarios/:id/documentos',
+  upload.fields([
+    { name: 'constanciaAfip', maxCount: 1 },
+    { name: 'certificadoEstudio', maxCount: 1 },
+    { name: 'certificadoTrabajo', maxCount: 1 },
+  ]),
+  async (req, res) => {
+    const { id } = req.params;
+    try {
+      let constanciaAfipUrl = null;
+      let certificadoEstudioUrl = null;
+
+      if (req.files?.constanciaAfip) {
+        const archivo = req.files.constanciaAfip[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto',
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      if (req.files?.certificadoTrabajo) {
+        const archivo = req.files.certificadoTrabajo[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto',
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      if (req.files?.certificadoEstudio) {
+        const archivo = req.files.certificadoEstudio[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+          resource_type: 'auto',
+        });
+        certificadoEstudioUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      const result = await pool.query(
+        `UPDATE users SET
+          constancia_afip_url = COALESCE($1, constancia_afip_url),
+          certificado_estudio_url = COALESCE($2, certificado_estudio_url)
+         WHERE id = $3 RETURNING *`,
+        [constanciaAfipUrl, certificadoEstudioUrl, id]
+      );
+
+      res.json(result.rows[0]);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Error al actualizar documentos' });
+    }
+  }
+);
+
+/**
+ * Publicaciones
  */
 app.post('/publicaciones', upload.array('fotos', 5), async (req, res) => {
   try {
@@ -184,7 +378,6 @@ app.post('/publicaciones', upload.array('fotos', 5), async (req, res) => {
       user_id,
     } = req.body;
 
-    // CONVIERTE envio a booleano REAL (corrige el error 500)
     const envioBool = envio === 'true' || envio === true;
 
     const compatParsed = JSON.parse(compatibilidad || '[]');
@@ -193,7 +386,7 @@ app.post('/publicaciones', upload.array('fotos', 5), async (req, res) => {
     for (const file of req.files) {
       const result = await cloudinary.uploader.upload(file.path, {
         folder: 'autopartes',
-        resource_type: 'auto', // Por si suben PDF por error
+        resource_type: 'auto',
       });
       fotosUrls.push(result.secure_url);
       fs.unlinkSync(file.path);
@@ -229,13 +422,9 @@ app.post('/publicaciones', upload.array('fotos', 5), async (req, res) => {
   }
 });
 
-/**
- * Obtener todas las publicaciones
- */
 app.get('/publicaciones', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM publicaciones');
-    // Parsear fotos a array si es string
     const publicaciones = result.rows.map(pub => ({
       ...pub,
       fotos: typeof pub.fotos === 'string' ? JSON.parse(pub.fotos) : pub.fotos
@@ -247,9 +436,6 @@ app.get('/publicaciones', async (req, res) => {
   }
 });
 
-/**
- * Obtener una publicación por ID
- */
 app.get('/publicaciones/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -266,9 +452,6 @@ app.get('/publicaciones/:id', async (req, res) => {
   }
 });
 
-/**
- * Pausar o volver a publicar una publicación
- */
 app.put('/publicaciones/:id/pausar', async (req, res) => {
   const { id } = req.params;
   const { pausada } = req.body;
@@ -287,9 +470,6 @@ app.put('/publicaciones/:id/pausar', async (req, res) => {
   }
 });
 
-/**
- * Borrar una publicación
- */
 app.delete('/publicaciones/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -301,9 +481,6 @@ app.delete('/publicaciones/:id', async (req, res) => {
   }
 });
 
-/**
- * Editar publicación (datos + imágenes + compatibilidad + envio + tipo_envio)
- */
 app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) => {
   const { id } = req.params;
   const {
@@ -341,14 +518,13 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
       for (const file of req.files) {
         const uploadResult = await cloudinary.uploader.upload(file.path, {
           folder: 'autopartes',
-          resource_type: 'auto', // Por si suben PDF por error
+          resource_type: 'auto',
         });
         nuevasFotos.push(uploadResult.secure_url);
         fs.unlinkSync(file.path);
       }
     }
 
-    // Convierte envio a booleano real (igual que en crear publicación)
     let envioBool = null;
     if (typeof envio !== 'undefined') {
       envioBool = envio === 'true' || envio === true;
@@ -396,10 +572,9 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
 });
 
 /**
- * Registrar una venta (ahora guarda datos de envío)
+ * Ventas
  */
 app.post('/ventas', async (req, res) => {
-  console.log('BODY VENTA:', req.body);
   const {
     vendedor_id,
     comprador_id,
@@ -437,9 +612,6 @@ app.post('/ventas', async (req, res) => {
   }
 });
 
-/**
- * Obtener todas las compras de un usuario (ventas donde es comprador)
- */
 app.get('/usuarios/:id/compras', async (req, res) => {
   const { id } = req.params;
   try {
@@ -458,9 +630,6 @@ app.get('/usuarios/:id/compras', async (req, res) => {
   }
 });
 
-/**
- * Obtener todas las ventas de un usuario (ventas donde es vendedor)
- */
 app.get('/usuarios/:id/ventas', async (req, res) => {
   const { id } = req.params;
   try {
@@ -479,9 +648,6 @@ app.get('/usuarios/:id/ventas', async (req, res) => {
   }
 });
 
-/**
- * Actualizar el cashback del usuario
- */
 app.put('/usuarios/:id/cashback', async (req, res) => {
   const { id } = req.params;
   const { cashback } = req.body;
@@ -500,9 +666,6 @@ app.put('/usuarios/:id/cashback', async (req, res) => {
   }
 });
 
-/**
- * Obtener cantidad de compras de un usuario en los últimos 30 días
- */
 app.get('/usuarios/:id/compras-ultimos-30', async (req, res) => {
   const { id } = req.params;
   try {
@@ -518,9 +681,6 @@ app.get('/usuarios/:id/compras-ultimos-30', async (req, res) => {
   }
 });
 
-/**
- * Obtener datos de un usuario
- */
 app.get('/usuarios/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -535,9 +695,6 @@ app.get('/usuarios/:id', async (req, res) => {
   }
 });
 
-/**
- * Obtener cantidad de ventas de un usuario en los últimos 30 días
- */
 app.get('/usuarios/:id/ventas-ultimos-30', async (req, res) => {
   const { id } = req.params;
   try {
@@ -554,163 +711,8 @@ app.get('/usuarios/:id/ventas-ultimos-30', async (req, res) => {
 });
 
 /**
- * Editar datos de usuario (nombre, apellido, email, contraseña, telefono, nombre_local, archivos)
- * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
- * Guarda certificadoEstudio en certificado_estudio_url
- * Permite PDF usando resource_type: 'auto'
+ * Recuperación de contraseña
  */
-app.put(
-  '/usuarios/:id',
-  upload.fields([
-    { name: 'constanciaAfip', maxCount: 1 },
-    { name: 'certificadoEstudio', maxCount: 1 },
-    { name: 'certificadoTrabajo', maxCount: 1 },
-  ]),
-  async (req, res) => {
-    const { id } = req.params;
-    const { nombre, apellido, email, contrasena, telefono, nombre_local } = req.body;
-
-    try {
-      const userResult = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-      if (userResult.rows.length === 0) {
-        return res.status(404).json({ error: 'Usuario no encontrado' });
-      }
-
-      let constanciaAfipUrl = null;
-      let certificadoEstudioUrl = null;
-
-      if (req.files?.constanciaAfip) {
-        const archivo = req.files.constanciaAfip[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-          resource_type: 'auto', // Permite PDF
-        });
-        constanciaAfipUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
-      }
-
-      if (req.files?.certificadoTrabajo) {
-        const archivo = req.files.certificadoTrabajo[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-          resource_type: 'auto', // Permite PDF
-        });
-        constanciaAfipUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
-      }
-
-      if (req.files?.certificadoEstudio) {
-        const archivo = req.files.certificadoEstudio[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-          resource_type: 'auto', // Permite PDF
-        });
-        certificadoEstudioUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
-      }
-
-      const result = await pool.query(
-        `UPDATE users SET
-          nombre = COALESCE($1, nombre),
-          apellido = COALESCE($2, apellido),
-          email = COALESCE($3, email),
-          password = COALESCE($4, password),
-          telefono = COALESCE($5, telefono),
-          nombre_local = COALESCE($6, nombre_local),
-          constancia_afip_url = COALESCE($7, constancia_afip_url),
-          certificado_estudio_url = COALESCE($8, certificado_estudio_url)
-         WHERE id = $9
-         RETURNING *`,
-        [
-          nombre || null,
-          apellido || null,
-          email || null,
-          contrasena || null,
-          telefono || null,
-          nombre_local || null,
-          constanciaAfipUrl,
-          certificadoEstudioUrl,
-          id
-        ]
-      );
-
-      res.json({
-        message: 'Perfil actualizado correctamente',
-        usuario: result.rows[0]
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Error al actualizar usuario' });
-    }
-  }
-);
-
-/**
- * Subir documentos de un usuario (solo archivos, sin datos)
- * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
- * Guarda certificadoEstudio en certificado_estudio_url
- * Permite PDF usando resource_type: 'auto'
- */
-app.post(
-  '/usuarios/:id/documentos',
-  upload.fields([
-    { name: 'constanciaAfip', maxCount: 1 },
-    { name: 'certificadoEstudio', maxCount: 1 },
-    { name: 'certificadoTrabajo', maxCount: 1 },
-  ]),
-  async (req, res) => {
-    const { id } = req.params;
-    try {
-      let constanciaAfipUrl = null;
-      let certificadoEstudioUrl = null;
-
-      if (req.files?.constanciaAfip) {
-        const archivo = req.files.constanciaAfip[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-          resource_type: 'auto', // Permite PDF
-        });
-        constanciaAfipUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
-      }
-
-      if (req.files?.certificadoTrabajo) {
-        const archivo = req.files.certificadoTrabajo[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-          resource_type: 'auto', // Permite PDF
-        });
-        constanciaAfipUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
-      }
-
-      if (req.files?.certificadoEstudio) {
-        const archivo = req.files.certificadoEstudio[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-          resource_type: 'auto', // Permite PDF
-        });
-        certificadoEstudioUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
-      }
-
-      const result = await pool.query(
-        `UPDATE users SET
-          constancia_afip_url = COALESCE($1, constancia_afip_url),
-          certificado_estudio_url = COALESCE($2, certificado_estudio_url)
-         WHERE id = $3 RETURNING *`,
-        [constanciaAfipUrl, certificadoEstudioUrl, id]
-      );
-
-      res.json(result.rows[0]);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ error: 'Error al actualizar documentos' });
-    }
-  }
-);
-
-// --- Recuperación de contraseña ---
 app.post('/recuperacion', async (req, res) => {
   const { email, dni } = req.body;
 
@@ -737,7 +739,6 @@ app.post('/recuperacion', async (req, res) => {
   }
 });
 
-// Actualizar contraseña usando email y DNI
 app.post('/actualizar-password', async (req, res) => {
   const { email, dni, nuevaPassword } = req.body;
 
@@ -767,7 +768,6 @@ app.post('/actualizar-password', async (req, res) => {
   }
 });
 
-// Subir comprobante de pago para una venta
 app.post('/ventas/:id/comprobante', upload.single('comprobante'), async (req, res) => {
   const { id } = req.params;
   try {
@@ -775,7 +775,7 @@ app.post('/ventas/:id/comprobante', upload.single('comprobante'), async (req, re
 
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'comprobantes',
-      resource_type: 'auto', // Permite PDF
+      resource_type: 'auto',
     });
     const comprobanteUrl = result.secure_url;
     fs.unlinkSync(req.file.path);
@@ -791,7 +791,6 @@ app.post('/ventas/:id/comprobante', upload.single('comprobante'), async (req, re
   }
 });
 
-// 🟢 Arrancar el servidor
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en puerto ${PORT}`);
 });
