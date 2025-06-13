@@ -392,6 +392,7 @@ app.post('/ventas', async (req, res) => {
     res.status(500).json({ error: 'Error al registrar la venta' });
   }
 });
+
 /**
  * Obtener todas las compras de un usuario (ventas donde es comprador)
  */
@@ -412,6 +413,28 @@ app.get('/usuarios/:id/compras', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener compras del usuario' });
   }
 });
+
+/**
+ * Obtener todas las ventas de un usuario (ventas donde es vendedor)
+ */
+app.get('/usuarios/:id/ventas', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT v.*, p.nombre_producto, p.envio, p.tipo_envio
+       FROM ventas v
+       LEFT JOIN publicaciones p ON v.publicacion_id = p.id
+       WHERE v.vendedor_id = $1
+       ORDER BY v.fecha DESC`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error al obtener ventas del usuario' });
+  }
+});
+
 /**
  * Actualizar el cashback del usuario
  */
@@ -497,7 +520,6 @@ app.put(
   ]),
   async (req, res) => {
     const { id } = req.params;
-    // AGREGA nombre_local aquí
     const { nombre, apellido, email, contrasena, telefono, nombre_local } = req.body;
 
     try {
@@ -527,7 +549,6 @@ app.put(
         fs.unlinkSync(archivo.path);
       }
 
-      // AGREGA nombre_local en la query
       const result = await pool.query(
         `UPDATE users SET
           nombre = COALESCE($1, nombre),
