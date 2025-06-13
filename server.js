@@ -33,10 +33,22 @@ app.use(express.urlencoded({ extended: true }));
 
 const upload = multer({ dest: 'tmp/' });
 
+// Función para subir archivos a Cloudinary y aceptar PDF correctamente
+async function uploadToCloudinary(archivo, folder) {
+  const esPDF = archivo.mimetype === 'application/pdf';
+  const result = await cloudinary.uploader.upload(archivo.path, {
+    folder,
+    resource_type: esPDF ? 'raw' : 'auto',
+  });
+  fs.unlinkSync(archivo.path);
+  return result.secure_url;
+}
+
 /**
  * Registro de usuarios (Mecánico o Vendedor)
  * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
  * Guarda certificadoEstudio en certificado_estudio_url
+ * Permite PDF usando resource_type: 'raw'
  */
 app.post(
   '/register',
@@ -66,33 +78,14 @@ app.post(
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
 
-      // Si sube constanciaAfip, se guarda ahí
       if (req.files?.constanciaAfip) {
-        const archivo = req.files.constanciaAfip[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        constanciaAfipUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
+        constanciaAfipUrl = await uploadToCloudinary(req.files.constanciaAfip[0], 'documentos');
       }
-
-      // Si sube certificadoTrabajo (ARCA), también se guarda en constanciaAfipUrl (sobrescribe si ya había)
       if (req.files?.certificadoTrabajo) {
-        const archivo = req.files.certificadoTrabajo[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        constanciaAfipUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
+        constanciaAfipUrl = await uploadToCloudinary(req.files.certificadoTrabajo[0], 'documentos');
       }
-
       if (req.files?.certificadoEstudio) {
-        const archivo = req.files.certificadoEstudio[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        certificadoEstudioUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
+        certificadoEstudioUrl = await uploadToCloudinary(req.files.certificadoEstudio[0], 'documentos');
       }
 
       const result = await pool.query(
@@ -187,8 +180,10 @@ app.post('/publicaciones', upload.array('fotos', 5), async (req, res) => {
 
     const fotosUrls = [];
     for (const file of req.files) {
+      const esPDF = file.mimetype === 'application/pdf';
       const result = await cloudinary.uploader.upload(file.path, {
         folder: 'autopartes',
+        resource_type: esPDF ? 'raw' : 'auto',
       });
       fotosUrls.push(result.secure_url);
       fs.unlinkSync(file.path);
@@ -334,8 +329,10 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
 
     if (req.files && req.files.length > 0) {
       for (const file of req.files) {
+        const esPDF = file.mimetype === 'application/pdf';
         const uploadResult = await cloudinary.uploader.upload(file.path, {
           folder: 'autopartes',
+          resource_type: esPDF ? 'raw' : 'auto',
         });
         nuevasFotos.push(uploadResult.secure_url);
         fs.unlinkSync(file.path);
@@ -551,6 +548,7 @@ app.get('/usuarios/:id/ventas-ultimos-30', async (req, res) => {
  * Editar datos de usuario (nombre, apellido, email, contraseña, telefono, nombre_local, archivos)
  * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
  * Guarda certificadoEstudio en certificado_estudio_url
+ * Permite PDF usando resource_type: 'raw'
  */
 app.put(
   '/usuarios/:id',
@@ -573,30 +571,13 @@ app.put(
       let certificadoEstudioUrl = null;
 
       if (req.files?.constanciaAfip) {
-        const archivo = req.files.constanciaAfip[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        constanciaAfipUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
+        constanciaAfipUrl = await uploadToCloudinary(req.files.constanciaAfip[0], 'documentos');
       }
-
       if (req.files?.certificadoTrabajo) {
-        const archivo = req.files.certificadoTrabajo[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        constanciaAfipUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
+        constanciaAfipUrl = await uploadToCloudinary(req.files.certificadoTrabajo[0], 'documentos');
       }
-
       if (req.files?.certificadoEstudio) {
-        const archivo = req.files.certificadoEstudio[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        certificadoEstudioUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
+        certificadoEstudioUrl = await uploadToCloudinary(req.files.certificadoEstudio[0], 'documentos');
       }
 
       const result = await pool.query(
@@ -639,6 +620,7 @@ app.put(
  * Subir documentos de un usuario (solo archivos, sin datos)
  * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
  * Guarda certificadoEstudio en certificado_estudio_url
+ * Permite PDF usando resource_type: 'raw'
  */
 app.post(
   '/usuarios/:id/documentos',
@@ -654,30 +636,13 @@ app.post(
       let certificadoEstudioUrl = null;
 
       if (req.files?.constanciaAfip) {
-        const archivo = req.files.constanciaAfip[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        constanciaAfipUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
+        constanciaAfipUrl = await uploadToCloudinary(req.files.constanciaAfip[0], 'documentos');
       }
-
       if (req.files?.certificadoTrabajo) {
-        const archivo = req.files.certificadoTrabajo[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        constanciaAfipUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
+        constanciaAfipUrl = await uploadToCloudinary(req.files.certificadoTrabajo[0], 'documentos');
       }
-
       if (req.files?.certificadoEstudio) {
-        const archivo = req.files.certificadoEstudio[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        certificadoEstudioUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
+        certificadoEstudioUrl = await uploadToCloudinary(req.files.certificadoEstudio[0], 'documentos');
       }
 
       const result = await pool.query(
@@ -759,8 +724,10 @@ app.post('/ventas/:id/comprobante', upload.single('comprobante'), async (req, re
   try {
     if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
 
+    const esPDF = req.file.mimetype === 'application/pdf';
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: 'comprobantes',
+      resource_type: esPDF ? 'raw' : 'auto',
     });
     const comprobanteUrl = result.secure_url;
     fs.unlinkSync(req.file.path);
