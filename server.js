@@ -585,14 +585,15 @@ app.post('/ventas', async (req, res) => {
     direccion_envio,
     altura_envio,
     entrecalles_envio
+    confirmacioncomprador
   } = req.body;
   try {
     const result = await pool.query(
       `INSERT INTO ventas (
         vendedor_id, comprador_id, publicacion_id, cantidad, monto, fecha,
-        localidad_envio, direccion_envio, altura_envio, entrecalles_envio
+        localidad_envio, direccion_envio, altura_envio, entrecalles_envio, confirmacioncomprador
       )
-      VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9) RETURNING *`,
+      VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9, $10) RETURNING *`,
       [
         vendedor_id,
         comprador_id,
@@ -603,6 +604,7 @@ app.post('/ventas', async (req, res) => {
         direccion_envio || null,
         altura_envio || null,
         entrecalles_envio || null
+        typeof confirmacioncomprador === 'undefined' ? false : confirmacioncomprador // CAMBIO confirmacioncomprador
       ]
     );
     res.status(201).json({ message: 'Venta registrada', venta: result.rows[0] });
@@ -644,6 +646,7 @@ app.put('/ventas/:id', async (req, res) => {
     altura_envio,
     entrecalles_envio,
     pago_recibido
+    confirmacioncomprador // CAMBIO confirmacioncomprador
   } = req.body;
 
   try {
@@ -656,7 +659,8 @@ app.put('/ventas/:id', async (req, res) => {
         altura_envio = COALESCE($5, altura_envio),
         entrecalles_envio = COALESCE($6, entrecalles_envio),
         pago_recibido = COALESCE($7, pago_recibido)
-      WHERE id = $8
+        confirmacioncomprador = COALESCE($8, confirmacioncomprador) -- CAMBIO confirmacioncomprador
+      WHERE id = $9
       RETURNING *`,
       [
         cantidad || null,
@@ -666,6 +670,7 @@ app.put('/ventas/:id', async (req, res) => {
         altura_envio || null,
         entrecalles_envio || null,
         typeof pago_recibido === 'undefined' ? null : pago_recibido,
+        typeof confirmacioncomprador === 'undefined' ? null : confirmacioncomprador, // CAMBIO confirmacioncomprador
         id
       ]
     );
