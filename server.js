@@ -584,7 +584,7 @@ app.post('/ventas', async (req, res) => {
     localidad_envio,
     direccion_envio,
     altura_envio,
-    entrecalles_envio
+    entrecalles_envio,
     confirmacioncomprador
   } = req.body;
   try {
@@ -603,7 +603,7 @@ app.post('/ventas', async (req, res) => {
         localidad_envio || null,
         direccion_envio || null,
         altura_envio || null,
-        entrecalles_envio || null
+        entrecalles_envio || null,
         typeof confirmacioncomprador === 'undefined' ? false : confirmacioncomprador // CAMBIO confirmacioncomprador
       ]
     );
@@ -645,7 +645,7 @@ app.put('/ventas/:id', async (req, res) => {
     direccion_envio,
     altura_envio,
     entrecalles_envio,
-    pago_recibido
+    pago_recibido,
     confirmacioncomprador // CAMBIO confirmacioncomprador
   } = req.body;
 
@@ -670,7 +670,7 @@ app.put('/ventas/:id', async (req, res) => {
         altura_envio || null,
         entrecalles_envio || null,
         typeof pago_recibido === 'undefined' ? null : pago_recibido,
-        typeof confirmacioncomprador === 'undefined' ? null : confirmacioncomprador, // CAMBIO confirmacioncomprador
+
         id
       ]
     );
