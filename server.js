@@ -35,7 +35,8 @@ const upload = multer({ dest: 'tmp/' });
 
 /**
  * Registro de usuarios (Mecánico o Vendedor)
- * Ahora acepta constanciaAfip, certificadoEstudio y certificadoTrabajo
+ * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
+ * Guarda certificadoEstudio en certificado_estudio_url
  */
 app.post(
   '/register',
@@ -64,10 +65,20 @@ app.post(
     try {
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
-      let certificadoTrabajoUrl = null;
 
+      // Si sube constanciaAfip, se guarda ahí
       if (req.files?.constanciaAfip) {
         const archivo = req.files.constanciaAfip[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      // Si sube certificadoTrabajo (ARCA), también se guarda en constanciaAfipUrl (sobrescribe si ya había)
+      if (req.files?.certificadoTrabajo) {
+        const archivo = req.files.certificadoTrabajo[0];
         const result = await cloudinary.uploader.upload(archivo.path, {
           folder: 'documentos',
         });
@@ -84,19 +95,10 @@ app.post(
         fs.unlinkSync(archivo.path);
       }
 
-      if (req.files?.certificadoTrabajo) {
-        const archivo = req.files.certificadoTrabajo[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        certificadoTrabajoUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
-      }
-
       const result = await pool.query(
         `INSERT INTO users 
-          (email, password, tipo_cuenta, nombre, apellido, nombre_local, localidad, dni, telefono, constancia_afip_url, certificado_estudio_url, certificado_trabajo_url)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
+          (email, password, tipo_cuenta, nombre, apellido, nombre_local, localidad, dni, telefono, constancia_afip_url, certificado_estudio_url)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
         [
           email,
           password,
@@ -109,7 +111,6 @@ app.post(
           telefono || null,
           constanciaAfipUrl,
           certificadoEstudioUrl,
-          certificadoTrabajoUrl,
         ]
       );
 
@@ -548,7 +549,8 @@ app.get('/usuarios/:id/ventas-ultimos-30', async (req, res) => {
 
 /**
  * Editar datos de usuario (nombre, apellido, email, contraseña, telefono, nombre_local, archivos)
- * Ahora acepta certificadoTrabajo
+ * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
+ * Guarda certificadoEstudio en certificado_estudio_url
  */
 app.put(
   '/usuarios/:id',
@@ -569,10 +571,18 @@ app.put(
 
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
-      let certificadoTrabajoUrl = null;
 
       if (req.files?.constanciaAfip) {
         const archivo = req.files.constanciaAfip[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      if (req.files?.certificadoTrabajo) {
+        const archivo = req.files.certificadoTrabajo[0];
         const result = await cloudinary.uploader.upload(archivo.path, {
           folder: 'documentos',
         });
@@ -589,15 +599,6 @@ app.put(
         fs.unlinkSync(archivo.path);
       }
 
-      if (req.files?.certificadoTrabajo) {
-        const archivo = req.files.certificadoTrabajo[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        certificadoTrabajoUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
-      }
-
       const result = await pool.query(
         `UPDATE users SET
           nombre = COALESCE($1, nombre),
@@ -607,9 +608,8 @@ app.put(
           telefono = COALESCE($5, telefono),
           nombre_local = COALESCE($6, nombre_local),
           constancia_afip_url = COALESCE($7, constancia_afip_url),
-          certificado_estudio_url = COALESCE($8, certificado_estudio_url),
-          certificado_trabajo_url = COALESCE($9, certificado_trabajo_url)
-         WHERE id = $10
+          certificado_estudio_url = COALESCE($8, certificado_estudio_url)
+         WHERE id = $9
          RETURNING *`,
         [
           nombre || null,
@@ -620,7 +620,6 @@ app.put(
           nombre_local || null,
           constanciaAfipUrl,
           certificadoEstudioUrl,
-          certificadoTrabajoUrl,
           id
         ]
       );
@@ -638,7 +637,8 @@ app.put(
 
 /**
  * Subir documentos de un usuario (solo archivos, sin datos)
- * Ahora acepta certificadoTrabajo
+ * Guarda constanciaAfip y/o certificadoTrabajo en constancia_afip_url
+ * Guarda certificadoEstudio en certificado_estudio_url
  */
 app.post(
   '/usuarios/:id/documentos',
@@ -652,10 +652,18 @@ app.post(
     try {
       let constanciaAfipUrl = null;
       let certificadoEstudioUrl = null;
-      let certificadoTrabajoUrl = null;
 
       if (req.files?.constanciaAfip) {
         const archivo = req.files.constanciaAfip[0];
+        const result = await cloudinary.uploader.upload(archivo.path, {
+          folder: 'documentos',
+        });
+        constanciaAfipUrl = result.secure_url;
+        fs.unlinkSync(archivo.path);
+      }
+
+      if (req.files?.certificadoTrabajo) {
+        const archivo = req.files.certificadoTrabajo[0];
         const result = await cloudinary.uploader.upload(archivo.path, {
           folder: 'documentos',
         });
@@ -672,22 +680,12 @@ app.post(
         fs.unlinkSync(archivo.path);
       }
 
-      if (req.files?.certificadoTrabajo) {
-        const archivo = req.files.certificadoTrabajo[0];
-        const result = await cloudinary.uploader.upload(archivo.path, {
-          folder: 'documentos',
-        });
-        certificadoTrabajoUrl = result.secure_url;
-        fs.unlinkSync(archivo.path);
-      }
-
       const result = await pool.query(
         `UPDATE users SET
           constancia_afip_url = COALESCE($1, constancia_afip_url),
-          certificado_estudio_url = COALESCE($2, certificado_estudio_url),
-          certificado_trabajo_url = COALESCE($3, certificado_trabajo_url)
-         WHERE id = $4 RETURNING *`,
-        [constanciaAfipUrl, certificadoEstudioUrl, certificadoTrabajoUrl, id]
+          certificado_estudio_url = COALESCE($2, certificado_estudio_url)
+         WHERE id = $3 RETURNING *`,
+        [constanciaAfipUrl, certificadoEstudioUrl, id]
       );
 
       res.json(result.rows[0]);
