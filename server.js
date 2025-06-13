@@ -376,15 +376,39 @@ app.put('/publicaciones/:id', upload.array('nuevasFotos', 5), async (req, res) =
 });
 
 /**
- * Registrar una venta
+ * Registrar una venta (ahora guarda datos de envío)
  */
 app.post('/ventas', async (req, res) => {
-  const { vendedor_id, comprador_id, publicacion_id, cantidad, monto } = req.body;
+  console.log('BODY VENTA:', req.body); // <-- AGREGA ESTA LÍNEA
+  const {
+    vendedor_id,
+    comprador_id,
+    publicacion_id,
+    cantidad,
+    monto,
+    localidad_envio,
+    direccion_envio,
+    altura_envio,
+    entrecalles_envio
+  } = req.body;
   try {
     const result = await pool.query(
-      `INSERT INTO ventas (vendedor_id, comprador_id, publicacion_id, cantidad, monto, fecha)
-       VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
-      [vendedor_id, comprador_id, publicacion_id, cantidad, monto]
+      `INSERT INTO ventas (
+        vendedor_id, comprador_id, publicacion_id, cantidad, monto, fecha,
+        localidad_envio, direccion_envio, altura_envio, entrecalles_envio
+      )
+      VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9) RETURNING *`,
+      [
+        vendedor_id,
+        comprador_id,
+        publicacion_id,
+        cantidad,
+        monto,
+        localidad_envio || null,
+        direccion_envio || null,
+        altura_envio || null,
+        entrecalles_envio || null
+      ]
     );
     res.status(201).json({ message: 'Venta registrada', venta: result.rows[0] });
   } catch (err) {
