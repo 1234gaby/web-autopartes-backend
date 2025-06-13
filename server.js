@@ -658,7 +658,7 @@ app.put('/ventas/:id', async (req, res) => {
         direccion_envio = COALESCE($4, direccion_envio),
         altura_envio = COALESCE($5, altura_envio),
         entrecalles_envio = COALESCE($6, entrecalles_envio),
-        pago_recibido = COALESCE($7, pago_recibido)
+        pago_recibido = COALESCE($7, pago_recibido),
         confirmacioncomprador = COALESCE($8, confirmacioncomprador) -- CAMBIO confirmacioncomprador
       WHERE id = $9
       RETURNING *`,
